@@ -24,20 +24,25 @@ ax.set_xlabel('GPS time')
 ax.set_ylabel('Pseudorange [m]')
 ax.grid(True)
 
-fig, axes = plt.subplots(4,1, figsize=(12,8), sharex=True)
+fig, axes = plt.subplots(4,1, figsize=(10,8), sharex=True)
 axes[0].plot(rnxobs.time, rnxobs['C1C'].sel(sv=satname), label=satname)
 axes[1].plot(rnxobs.time, rnxobs['L1C'].sel(sv=satname), label=satname)
 axes[2].plot(rnxobs.time, rnxobs['D1C'].sel(sv=satname), label=satname)
 axes[3].plot(rnxobs.time, rnxobs['S1C'].sel(sv=satname), label=satname)
 
-axes[0].set_ylabel('Pseudo range[m]')
-axes[1].set_ylabel('carrier phase[cycle]')
-axes[2].set_ylabel('Doppler frequency[Hz]')
-axes[3].set_ylabel('C/N0 [dB]')
+axes[0].set_title('Pseudo range[m]')
+axes[0].set_ylabel(r'$\rho$ [m]')
+axes[1].set_title('carrier phase')
+axes[1].set_ylabel(r'$\phi$ [cycle]')
+axes[2].set_title('Doppler frequency')
+axes[2].set_ylabel('D[Hz]')
+axes[3].set_title('C/N0')
+axes[3].set_ylabel('S [dB]')
 for ax in axes:
     ax.grid(True)
-axes[3].set_xlabel('GPST')
 
+axes[3].set_xlabel('GPST')
+plt.tight_layout()
 plt.savefig('obs.png')
 
 CLIGHT = 299792458.0
@@ -55,7 +60,7 @@ cp_pr_l1 = cp_l1 - pr_l1 / wlen
 # caluclate doppler - difference of carrier phase
 b2 = cp_l1.diff('time') * (1/30.0) + dp_l1
 
-fig, axes = plt.subplots(3,1, figsize=(16,8), sharex=True)
+fig, axes = plt.subplots(3,1, figsize=(12,8), sharex=True)
 plt.suptitle(f'Analysis of Raw Measurement ({satname})')
 axes[0].set_title(r'$-N - \frac{2}{\lambda}I$')
 axes[0].plot(rnxobs.time, cp_pr_l1)
