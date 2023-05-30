@@ -32,9 +32,8 @@ axes[3].plot(rnxobs.time, rnxobs['S1C'].sel(sv=satname), label=satname)
 
 axes[0].set_ylabel('Pseudo range[m]')
 axes[1].set_ylabel('carrier phase[cycle]')
-axes[2].set_ylabel('Doppler frequency[m]')
+axes[2].set_ylabel('Doppler frequency[Hz]')
 axes[3].set_ylabel('C/N0 [dB]')
-axes[3].set_ylabel('Pseudorange [m]')
 for ax in axes:
     ax.grid(True)
 axes[3].set_xlabel('GPST')
