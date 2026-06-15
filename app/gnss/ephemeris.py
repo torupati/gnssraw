@@ -219,7 +219,7 @@ def read_rinex_nav(
     ephemerides: Dict[str, List[GPSEphemeris]] = {}
     ion_params: Dict[str, list[float]] = {}
 
-    with open(nav_file, "r") as f:
+    with open(nav_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     # Read header
@@ -322,9 +322,13 @@ def read_rinex_nav(
         if i < len(lines):
             line = lines[i]
             if len(line) > 61:
-                eph.tgd = float(line[42:61].replace("D", "E"))
+                tgd_str = line[42:61].strip()
+                if tgd_str:
+                    eph.tgd = float(tgd_str.replace("D", "E"))
             if len(line) > 80:
-                eph.iodc = float(line[61:80].replace("D", "E"))
+                iodc_str = line[61:80].strip()
+                if iodc_str:
+                    eph.iodc = float(iodc_str.replace("D", "E"))
 
         # Add ephemeris to list
         sat_id = f"G{prn:02d}"

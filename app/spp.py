@@ -387,6 +387,23 @@ def main() -> int:
     if args.database:
         db = GnssDatabase(args.database)
         db.save_epoch_observations(epochs)
+
+        for epoch in epochs:
+            _, sow = datetime_to_gps_week_seconds(epoch.datetime)
+            measurements = collect_measurements(epoch, nav_data, sow)
+            sat_positions: dict[str, dict[str, float | datetime | int]] = {}
+            for sat_id, sat_pos, dtsv, _sat_obs in measurements:
+                sat_positions[sat_id] = {
+                    "datetime": epoch.datetime,
+                    "nano_second": epoch.datetime.microsecond * 1000,
+                    "x": float(sat_pos[0]),
+                    "y": float(sat_pos[1]),
+                    "z": float(sat_pos[2]),
+                    "clock_bias": float(dtsv),
+                }
+            if sat_positions:
+                db.save_satellite_positions(sat_positions, epoch.datetime)
+
         for sol in solutions:
             db.save_spp_solution(
                 {
