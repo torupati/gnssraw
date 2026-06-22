@@ -253,8 +253,8 @@ def read_rinex_nav(
     while i < len(lines):
         line = lines[i]
 
-        # Process GPS satellite data only
-        if not line.startswith("G"):
+        # Process GPS and QZSS satellite data
+        if not (line.startswith("G") or line.startswith("J")):
             i += 1
             continue
 
