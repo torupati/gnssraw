@@ -64,7 +64,7 @@ def adrange(spos: np.ndarray, rpose: np.ndarray, phase_bias: float, wavelength: 
     return adjusted_range
 
 
-bands = ["L1", "L2"]  # signal bands for band-stacking
+bands = ["L1"]  # signal bands for band-stacking
 wlens = {
     "L1": wlen_L1,
     "L2": wlen_L2,
@@ -76,7 +76,9 @@ wlens = {
 # rec 2: 02P115
 # epoch 1: 2026-06-13 10:14:30
 # epoch 2: 2026-06-13 10:32:00
-satellite_order = ["G10", "G15", "G20", "G24"]
+#satellite_blocks = (["G10", "G15", "G20", "G24", "J03", "J07"])
+satellite_blocks = (["G10", "G15", "G20", "G24"], ["J03", "J07"])
+satellite_order = [sat for block in satellite_blocks for sat in block]
 
 _DB_DIR = Path(__file__).parent
 _DB_REC1 = _DB_DIR / "990840.db"
@@ -150,23 +152,53 @@ def add_widelane_to_epoch(obs_epoch: dict) -> dict:
                          "code_range": (freq_L1 * obs["L1"]["code_range"] - freq_L2 * obs["L2"]["code_range"]) / (freq_L1 - freq_L2)}
     return obs_epoch
 
-def doble_differencing_matrix(m: int) -> np.ndarray:
+def doble_differencing_matrix(num_sats: int) -> np.ndarray:
     """
-    Create a double differencing matrix for m satellites.
+    Create a double differencing matrix for num_sats satellites.
+    First row: SD between sat1 and sat2, second row: SD between sat1 and sat3, etc.
 
     Parameters:
-    m (int): Number of satellites.
+    num_sats (int): Number of satellites.
 
     Returns:
-    np.ndarray: Double differencing matrix of shape (m-1, m).
+    np.ndarray: Double differencing matrix of shape (num_sats-1, num_sats).
     """
-    D = np.zeros((m - 1, m + m), dtype=int)
-    for i in range(m - 1):
+    D = np.zeros((num_sats - 1, num_sats + num_sats), dtype=int)
+    for i in range(num_sats - 1):
         D[i, 0] = 1
         D[i, i + 1] = -1
-        D[i, m + 0] = -1
-        D[i, m + i + 1] = 1
+        D[i, num_sats + 0] = -1
+        D[i, num_sats + i + 1] = 1
     return D
+
+
+def block_doble_differencing_matrix(sat_blocks: tuple[list[str], ...]) -> tuple[np.ndarray, list[str]]:
+    """Create one global DD matrix by stacking block-wise DD rows.
+
+    Each block has its own reference satellite (the first satellite in the block).
+    """
+    flat_sat_order = [sat for block in sat_blocks for sat in block]
+    sat_index = {sat: i for i, sat in enumerate(flat_sat_order)}
+    m_total = len(flat_sat_order)
+    rows: list[np.ndarray] = []
+
+    for block in sat_blocks:
+        if len(block) < 2:
+            continue
+        print(f"Creating DD rows for block: {block}")
+        ref_idx = sat_index[block[0]]
+        for sat in block[1:]:
+            sat_idx = sat_index[sat]
+            dd_row = np.zeros(2 * m_total, dtype=int)
+            dd_row[ref_idx] = 1
+            dd_row[sat_idx] = -1
+            dd_row[m_total + ref_idx] = -1
+            dd_row[m_total + sat_idx] = 1
+            rows.append(dd_row)
+
+    if not rows:
+        return np.zeros((0, 2 * m_total), dtype=int), flat_sat_order
+    return np.vstack(rows), flat_sat_order
 
 def test_doble_differencing_matrix():
     D = doble_differencing_matrix(4)
@@ -182,9 +214,13 @@ if "WL" in bands:
         add_widelane_to_epoch(epoch)
 
 # DD observations and code-phase biases per band
-dd_matrix = doble_differencing_matrix(len(satellite_order))
-num_dd = len(satellite_order) - 1
+dd_matrix, satellite_order = block_doble_differencing_matrix(satellite_blocks)
+num_dd = dd_matrix.shape[0]
 num_bands = len(bands)
+print(f"dd_matrix shape: {dd_matrix.shape}, num_dd: {num_dd}, num_bands: {num_bands}")
+
+if num_dd == 0:
+    raise ValueError("At least one satellite block must contain 2 or more satellites for DD.")
 
 # dd_obss_epoch{1,2}[band] -> np.ndarray(num_dd,)  [cycles]
 dd_obss_epoch1: dict[str, np.ndarray] = {}
@@ -243,9 +279,12 @@ class epoch_line_of_sight:
         dd_los_vectors = dd_matrix @ np.array(los_vectors)
         return dd_los_vectors
 
-
-dd_model_epoch1 = ecpoch_ranges(satpos_epoch1_rec1, satpos_epoch1_rec2, rec2_pos, wlens["L1"])
-dd_model_epoch2 = ecpoch_ranges(satpos_epoch2_rec1, satpos_epoch2_rec2, rec2_pos, wlens["L1"])
+dd_model_epoch1: dict[str, ecpoch_ranges] = {}
+dd_model_epoch2: dict[str, ecpoch_ranges] = {}
+for b in bands:
+    wl = wlens[b]
+    dd_model_epoch1[b] = ecpoch_ranges(satpos_epoch1_rec1, satpos_epoch1_rec2, rec2_pos, wl)
+    dd_model_epoch2[b] = ecpoch_ranges(satpos_epoch2_rec1, satpos_epoch2_rec2, rec2_pos, wl)
 
 # dd_phase_biases[band] -> np.ndarray(num_dd,)  [cycles]
 dd_phase_biases: dict[str, np.ndarray] = {b: np.zeros(num_dd) for b in bands}
@@ -275,9 +314,8 @@ for ib, b in enumerate(bands):
     for ie in range(2):                # 2 epochs
         row = (2 * ib + ie) * num_dd
         W[row:row + num_dd, row:row + num_dd] = W_block
-
-print(f"DD covariance block (L1): σ²·DDᵀ =\n{sigma_phi['L1']**2 * C_DD_base}")
-print(f"Weight block (L1):\n{np.linalg.inv(sigma_phi['L1']**2 * C_DD_base)}\n")
+    print(f"DD covariance block ({b}): σ²·DDᵀ =\n{sigma_phi[b]**2 * C_DD_base}")
+    print(f"Weight block ({b}):\n{np.linalg.inv(sigma_phi[b]**2 * C_DD_base)}\n")
 
 # Band-stacking layout per iteration (row blocks, grouped by band then epoch):
 #   [epoch1_L1(num_dd), epoch2_L1(num_dd), epoch1_L2(num_dd), epoch2_L2(num_dd), ...]
@@ -286,8 +324,8 @@ print(f"Weight block (L1):\n{np.linalg.inv(sigma_phi['L1']**2 * C_DD_base)}\n")
 # Jacobian H: (2*num_bands*num_dd) x (3 + num_bands*num_dd)
 
 for itr in range(10):
-    dd_rho_ep1 = dd_model_epoch1(rec1_pos)  # DD geometric ranges epoch1 [m]
-    dd_rho_ep2 = dd_model_epoch2(rec1_pos)  # DD geometric ranges epoch2 [m]
+    dd_rho_ep1 = dd_model_epoch1[b](rec1_pos)  # DD geometric ranges epoch1 [m]
+    dd_rho_ep2 = dd_model_epoch2[b](rec1_pos)  # DD geometric ranges epoch2 [m]
 
     # --- unit LOS vectors from rec1 to each satellite: (m x 3) ---
     los_ep1 = np.array([(satpos_epoch1_rec1[s] - rec1_pos) / np.linalg.norm(satpos_epoch1_rec1[s] - rec1_pos) for s in satellite_order])
@@ -329,7 +367,7 @@ for itr in range(10):
 
 print("\n=== Result ===")
 print(f"{bands=}")
-print(f"satellite pair order: {satellite_order}")
+print(f"satellite blocks: {satellite_blocks}")
 print(f"rec1_pos      : {rec1_pos}")
 print("rec1_pos_product : ", rec1_pos_prodct)
 print(f"difference from rec1_pos_product: {rec1_pos - rec1_pos_prodct} ({np.linalg.norm(rec1_pos - rec1_pos_prodct):.3f} m)")
