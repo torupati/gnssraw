@@ -261,6 +261,7 @@ def read_rinex_nav(
         eph = GPSEphemeris()
 
         # Line 1: Satellite ID, time, clock correction parameters
+        system_code = line[0]
         prn = int(line[1:3])
         eph.prn = prn
         year = int(line[4:8])
@@ -330,8 +331,8 @@ def read_rinex_nav(
                 if iodc_str:
                     eph.iodc = float(iodc_str.replace("D", "E"))
 
-        # Add ephemeris to list
-        sat_id = f"G{prn:02d}"
+        # Add ephemeris to list (preserve constellation system code, e.g. G/J)
+        sat_id = f"{system_code}{prn:02d}"
         if sat_id not in ephemerides:
             ephemerides[sat_id] = []
         ephemerides[sat_id].append(eph)

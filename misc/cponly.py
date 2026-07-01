@@ -2,6 +2,7 @@
 Relative positioning using carrier phase measurements only.
 """
 
+import argparse
 from app.gnss.constants import CLIGHT, wlen_L1, wlen_L2, wlen_L5
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,21 @@ from app.gnss.database import GnssDatabase, Epoch
 freq_L1 = CLIGHT / wlen_L1
 freq_L2 = CLIGHT / wlen_L2
 freq_L5 = CLIGHT / wlen_L5
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Carrier-phase DD relative positioning")
+    parser.add_argument(
+        "--mode",
+        choices=["kinematic", "static"],
+        default="kinematic",
+        help="kinematic: estimate epoch1/epoch2 positions independently, static: enforce one common rover position",
+    )
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+IS_KINEMATIC = ARGS.mode == "kinematic"
 
 @dataclass
 class RangeObservation3D:
@@ -64,7 +80,7 @@ def adrange(spos: np.ndarray, rpose: np.ndarray, phase_bias: float, wavelength: 
     return adjusted_range
 
 
-bands = ["L1"]  # signal bands for band-stacking
+bands = ["L1", "L2"]  # signal bands for band-stacking
 wlens = {
     "L1": wlen_L1,
     "L2": wlen_L2,
@@ -80,9 +96,9 @@ wlens = {
 satellite_blocks = (["G10", "G15", "G20", "G24"], ["J03", "J07"])
 satellite_order = [sat for block in satellite_blocks for sat in block]
 
-_DB_DIR = Path(__file__).parent
-_DB_REC1 = _DB_DIR / "990840.db"
-_DB_REC2 = _DB_DIR / "02P115.db"
+_WORKSPACE_DIR = Path(__file__).resolve().parent.parent
+_DB_REC1 = _WORKSPACE_DIR / "devmemo" / "990840.db"
+_DB_REC2 = _WORKSPACE_DIR / "devmemo" / "02P115.db"
 _EPOCH1 = dt.datetime(2026, 6, 13, 10, 14, 30)
 _EPOCH2 = dt.datetime(2026, 6, 13, 10, 32, 0)
 
@@ -104,8 +120,8 @@ def _load_satpos_and_obs(db_path: Path, epoch_dt: dt.datetime, sat_ids: list) ->
     obs = {}
     session = db.Session()
     try:
-        epoch = session.query(Epoch).filter_by(datetime=epoch_dt).one()
-        for sat in epoch.satellites:
+        epoch_row = session.query(Epoch).filter_by(datetime=epoch_dt).one()
+        for sat in epoch_row.satellites:
             if sat.satellite_id not in sat_ids:
                 continue
             sid = sat.satellite_id
@@ -125,10 +141,11 @@ satpos_epoch2_rec1, obs_epoch2_rec1 = _load_satpos_and_obs(_DB_REC1, _EPOCH2, sa
 satpos_epoch1_rec2, obs_epoch1_rec2 = _load_satpos_and_obs(_DB_REC2, _EPOCH1, satellite_order)
 satpos_epoch2_rec2, obs_epoch2_rec2 = _load_satpos_and_obs(_DB_REC2, _EPOCH2, satellite_order)
 
-rec1_pos = np.array([-3914935.45305263, 3484252.78025698, 3622991.44248281])  # 990840 ECEF from SPP (epoch1)
+rec1_pos_epoch1 = np.array([-3914935.45305263, 3484252.78025698, 3622991.44248281])  # 990840 ECEF initial guess (epoch1)
+rec1_pos_epoch2 = rec1_pos_epoch1.copy()
 rec2_pos = np.array([-3913071.40599301, 3483060.03925556, 3626133.3403429])   # P115   ECEF from SPP (epoch1)
 
-rec1_pos_prodct = np.array([-3.9149318352E+06,  3.4842523204E+06,  3.6229899127E+06])
+rec1_pos_prodct_epoch1 = np.array([-3.9149318352E+06,  3.4842523204E+06,  3.6229899127E+06])
 rec2_pos_prodct = np.array([-3.9130665486E+06,  3.4830578480E+06,  3.6261311531E+06])
 rec2_pos = rec2_pos_prodct
 
@@ -145,7 +162,7 @@ def add_widelane_to_epoch(obs_epoch: dict) -> dict:
     Returns:
     dict: Updated observations with wide-lane phase range added.
     """
-    for sat, obs in obs_epoch.items():
+    for obs in obs_epoch.values():
         if "L1" in obs and "L2" in obs:
             # Calculate wide-lane phase in cycles: phi_WL = phi_L1 - phi_L2
             obs["WL"] = {"phase_range": obs["L1"]["phase_range"] - obs["L2"]["phase_range"],
@@ -210,8 +227,8 @@ def test_doble_differencing_matrix():
     print("Assertion passed: D is as expected.")
 
 if "WL" in bands:
-    for epoch in [obs_epoch1_rec1, obs_epoch2_rec1, obs_epoch1_rec2, obs_epoch2_rec2]:
-        add_widelane_to_epoch(epoch)
+    for epoch_obs in [obs_epoch1_rec1, obs_epoch2_rec1, obs_epoch1_rec2, obs_epoch2_rec2]:
+        add_widelane_to_epoch(epoch_obs)
 
 # DD observations and code-phase biases per band
 dd_matrix, satellite_order = block_doble_differencing_matrix(satellite_blocks)
@@ -319,20 +336,30 @@ for ib, b in enumerate(bands):
 
 # Band-stacking layout per iteration (row blocks, grouped by band then epoch):
 #   [epoch1_L1(num_dd), epoch2_L1(num_dd), epoch1_L2(num_dd), epoch2_L2(num_dd), ...]
-# Unknowns: [d_pos(3), d_N_L1(num_dd), d_N_L2(num_dd), ...]
 # Carrier phase equation (cycles): phi = rho/lambda + N
-# Jacobian H: (2*num_bands*num_dd) x (3 + num_bands*num_dd)
+# Unknowns in kinematic mode: [d_pos_epoch1(3), d_pos_epoch2(3), d_N_L1(num_dd), ...]
+# Unknowns in static mode: [d_pos_common(3), d_N_L1(num_dd), ...]
 
 for itr in range(10):
-    dd_rho_ep1 = dd_model_epoch1[b](rec1_pos)  # DD geometric ranges epoch1 [m]
-    dd_rho_ep2 = dd_model_epoch2[b](rec1_pos)  # DD geometric ranges epoch2 [m]
-
-    # --- unit LOS vectors from rec1 to each satellite: (m x 3) ---
-    los_ep1 = np.array([(satpos_epoch1_rec1[s] - rec1_pos) / np.linalg.norm(satpos_epoch1_rec1[s] - rec1_pos) for s in satellite_order])
-    los_ep2 = np.array([(satpos_epoch2_rec1[s] - rec1_pos) / np.linalg.norm(satpos_epoch2_rec1[s] - rec1_pos) for s in satellite_order])
+    dd_rho_ep1: dict[str, np.ndarray] = {}
+    dd_rho_ep2: dict[str, np.ndarray] = {}
+    los_ep1: dict[str, np.ndarray] = {}
+    los_ep2: dict[str, np.ndarray] = {}
+    for b in bands:
+        dd_rho_ep1[b] = dd_model_epoch1[b](rec1_pos_epoch1)  # DD geometric ranges epoch1 [m]
+        dd_rho_ep2[b] = dd_model_epoch2[b](rec1_pos_epoch2)  # DD geometric ranges epoch2 [m]
+        los_ep1[b] = np.array([
+            (satpos_epoch1_rec1[s] - rec1_pos_epoch1) / np.linalg.norm(satpos_epoch1_rec1[s] - rec1_pos_epoch1)
+            for s in satellite_order
+        ])
+        los_ep2[b] = np.array([
+            (satpos_epoch2_rec1[s] - rec1_pos_epoch2) / np.linalg.norm(satpos_epoch2_rec1[s] - rec1_pos_epoch2)
+            for s in satellite_order
+        ])
 
     # --- build stacked residual and Jacobian ---
-    n_unk = 3 + num_bands * num_dd
+    pos_cols = 6 if IS_KINEMATIC else 3
+    n_unk = pos_cols + num_bands * num_dd
     dy = np.zeros(n_obs)
     H  = np.zeros((n_obs, n_unk))
 
@@ -340,11 +367,14 @@ for itr in range(10):
         wl = wlens[b]
         row_ep1 = (2 * ib    ) * num_dd
         row_ep2 = (2 * ib + 1) * num_dd
-        col_N   = 3 + ib * num_dd
-        dy[row_ep1:row_ep1 + num_dd] = dd_obss_epoch1[b] - (dd_rho_ep1 / wl + dd_phase_biases[b])
-        dy[row_ep2:row_ep2 + num_dd] = dd_obss_epoch2[b] - (dd_rho_ep2 / wl + dd_phase_biases[b])
-        H[row_ep1:row_ep1 + num_dd, :3] = -D_left @ los_ep1 / wl
-        H[row_ep2:row_ep2 + num_dd, :3] = -D_left @ los_ep2 / wl
+        col_N   = pos_cols + ib * num_dd
+        dy[row_ep1:row_ep1 + num_dd] = dd_obss_epoch1[b] - (dd_rho_ep1[b] / wl + dd_phase_biases[b])
+        dy[row_ep2:row_ep2 + num_dd] = dd_obss_epoch2[b] - (dd_rho_ep2[b] / wl + dd_phase_biases[b])
+        H[row_ep1:row_ep1 + num_dd, :3] = -D_left @ los_ep1[b] / wl
+        if IS_KINEMATIC:
+            H[row_ep2:row_ep2 + num_dd, 3:6] = -D_left @ los_ep2[b] / wl
+        else:
+            H[row_ep2:row_ep2 + num_dd, :3] = -D_left @ los_ep2[b] / wl
         H[row_ep1:row_ep1 + num_dd, col_N:col_N + num_dd] = np.eye(num_dd)
         H[row_ep2:row_ep2 + num_dd, col_N:col_N + num_dd] = np.eye(num_dd)
 
@@ -353,23 +383,51 @@ for itr in range(10):
     dx, *_ = np.linalg.lstsq(HtW @ H, HtW @ dy, rcond=None)
 
     # --- update unknowns ---
-    rec1_pos = rec1_pos + dx[:3]
+    rec1_pos_epoch1 = rec1_pos_epoch1 + dx[:3]
+    if IS_KINEMATIC:
+        rec1_pos_epoch2 = rec1_pos_epoch2 + dx[3:6]
+    else:
+        rec1_pos_epoch2 = rec1_pos_epoch1.copy()
     for ib, b in enumerate(bands):
-        dd_phase_biases[b] += dx[3 + ib * num_dd:3 + (ib + 1) * num_dd]
+        start = pos_cols + ib * num_dd
+        dd_phase_biases[b] += dx[start:start + num_dd]
 
-    norm_pos  = np.linalg.norm(dx[:3])
-    norm_bias = np.linalg.norm(dx[3:])
-    print(f"Iteration {itr + 1}: |d_pos|={norm_pos:.6f} m  |d_bias|={norm_bias:.6f} cyc (|dy|^2={np.linalg.norm(dy)**2:e})")
-    print("  Updated rec1_pos: ", rec1_pos)
+    norm_pos_ep1 = np.linalg.norm(dx[:3])
+    if IS_KINEMATIC:
+        norm_pos_ep2 = np.linalg.norm(dx[3:6])
+    else:
+        norm_pos_ep2 = norm_pos_ep1
+    norm_bias = np.linalg.norm(dx[pos_cols:])
+    if IS_KINEMATIC:
+        print(
+            f"Iteration {itr + 1}: |d_pos_ep1|={norm_pos_ep1:.6f} m  |d_pos_ep2|={norm_pos_ep2:.6f} m  "
+            f"|d_bias|={norm_bias:.6f} cyc (|dy|^2={np.linalg.norm(dy)**2:e})"
+        )
+    else:
+        print(
+            f"Iteration {itr + 1}: |d_pos_common|={norm_pos_ep1:.6f} m  "
+            f"|d_bias|={norm_bias:.6f} cyc (|dy|^2={np.linalg.norm(dy)**2:e})"
+        )
+    print("  Updated rec1_pos_epoch1:", rec1_pos_epoch1)
+    print("  Updated rec1_pos_epoch2:", rec1_pos_epoch2)
     #if norm_pos < 1e-4 and norm_bias < 1e-4:
     #    print("  Converged.")
     #    break
 
 print("\n=== Result ===")
+print(f"mode={ARGS.mode}")
 print(f"{bands=}")
 print(f"satellite blocks: {satellite_blocks}")
-print(f"rec1_pos      : {rec1_pos}")
-print("rec1_pos_product : ", rec1_pos_prodct)
-print(f"difference from rec1_pos_product: {rec1_pos - rec1_pos_prodct} ({np.linalg.norm(rec1_pos - rec1_pos_prodct):.3f} m)")
+print(f"rec1_pos_epoch1      : {rec1_pos_epoch1}")
+print(f"rec1_pos_epoch2      : {rec1_pos_epoch2}")
+print("rec1_pos_product_epoch1 : ", rec1_pos_prodct_epoch1)
+print(
+    f"difference from rec1_pos_product_epoch1: {rec1_pos_epoch1 - rec1_pos_prodct_epoch1} "
+    f"({np.linalg.norm(rec1_pos_epoch1 - rec1_pos_prodct_epoch1):.3f} m)"
+)
+print(
+    f"epoch2 - epoch1 baseline: {rec1_pos_epoch2 - rec1_pos_epoch1} "
+    f"({np.linalg.norm(rec1_pos_epoch2 - rec1_pos_epoch1):.3f} m)"
+)
 for b in bands:
     print(f"dd_phase_biases[{b}]: {dd_phase_biases[b]}")
