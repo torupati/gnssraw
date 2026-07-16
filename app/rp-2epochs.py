@@ -187,12 +187,15 @@ def main() -> int:
     with config_path.open("r", encoding="utf-8") as f:
         cfg = json.load(f)
 
-    epoch1 = parse_datetime(cfg["start_time"])
-    epoch2 = parse_datetime(cfg["end_time"])
-    bands = list(cfg["bands"])
-    satellite_blocks = normalize_satellite_blocks(cfg["satellite_blocks"])
-    satellite_order = [sat for block in satellite_blocks for sat in block]
+    try:
+        epoch1 = parse_datetime(cfg["epochs"]["start_time"])
+        epoch2 = parse_datetime(cfg["epochs"]["end_time"])
+        bands = list(cfg["bands"])
+        satellite_blocks = normalize_satellite_blocks(cfg["satellite_blocks"])
+    except Exception as e:
+        raise ValueError(f"Invalid epoch format in config JSON: {e}")
 
+    satellite_order = [sat for block in satellite_blocks for sat in block]
     for b in bands:
         if b not in WLENS:
             raise ValueError(f"Unsupported band: {b}")
