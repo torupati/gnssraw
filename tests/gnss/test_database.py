@@ -262,7 +262,7 @@ def test_save_qzss_satellite_position(temp_db):
     """Test persisting satellite position for a QZSS satellite."""
     dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     qzss_sat = SatelliteObservation(
-        prn=193,
+        prn=1,
         signals={
             "L1": SatelliteSignalObservation(
                 pseudorange=22000000.0,
@@ -284,7 +284,7 @@ def test_save_qzss_satellite_position(temp_db):
     temp_db.save_epoch_observations([epoch_obs])
 
     positions = {
-        "J193": {
+        "J01": {
             "datetime": dt,
             "nano_second": 0,
             "x": 1234.0,

@@ -390,8 +390,9 @@ def main() -> int:
         # Determine valid time (using the first epoch's time or a placeholder)
         time_of_data = epochs[0].datetime if epochs else datetime.utcnow()
         ionosphere_manager.add_model(time_of_data, model)
-    print(
-        f"Using ionosphere model: {ionosphere_manager.get_model_for_time(epochs[0].datetime) if epochs else 'None'}"
+    logger.info(
+        "Using ionosphere model: %s",
+        ionosphere_manager.get_model_for_time(epochs[0].datetime) if epochs else None,
     )
 
     solutions = single_point_positioning(

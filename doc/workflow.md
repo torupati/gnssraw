@@ -30,7 +30,7 @@ Run
 
 ```bash
 $ source .venv/bin/activate
-(gnssraw) $ python app/spp.py ./devmemo/data/0840164k.26o ./devmemo/data/0840164k.26n --qzss-nav ./devmemo/data/0840164k.26q --database sample.
+(gnssraw) $ python app/spp.py ./devmemo/data/0840164k.26o ./devmemo/data/0840164k.26n --qzss-nav ./devmemo/data/0840164k.26q --database sample
 ```
 
 ```bash
@@ -55,8 +55,8 @@ $ uv run python misc/update_db_satpos_from_rnx2rtkp_trace.py   --db ./dataset/02
 ## Relative positioning
 
 
-Prepare the configuration file which describe satellite pairs to caluculate double-differential for the calculation. Currently, we need try-and-error to find good bias estimation of carrier-phase double differentials. Following is calculation takes 2 epoch as input to estimate phase bias.
-2 epochs, signal bands, and satellites must be configured in input json file.
+Prepare the configuration file which describes satellite pairs to calculate double-differential observations. Currently, we need trial and error to find a good bias estimation of carrier-phase double differentials. The following calculation takes 2 epochs as input to estimate phase bias.
+2 epochs, signal bands, and satellites must be configured in the input JSON file.
 
 ```json
 {
@@ -87,5 +87,5 @@ uv run python app/rp-2epochs.py --base-db dataset/02P115.db --rover-db dataset/9
 ```
 
 ```bash
-uv run python app/rp-bias.py --base-db dataset/990840.db --rover-db dataset/02P115.db --ambiguity-json devmemo/dd_info.json --start 2026-06-13 10:14:30 --end  2026-06-13 10:32:00 --base-pos==-3913066.5486,3483057.8480,3626131.1531
+uv run python app/rp-bias.py --base-db dataset/990840.db --rover-db dataset/02P115.db --ambiguity-json devmemo/dd_info.json --start 2026-06-13 10:14:30 --end  2026-06-13 10:32:00 --base-pos=-3913066.5486,3483057.8480,3626131.1531
 ```
