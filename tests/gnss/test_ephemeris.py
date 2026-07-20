@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+import tempfile
 
 import numpy as np
 import pytest
@@ -438,3 +439,50 @@ class TestReadRinexNav:
             assert hasattr(first_eph, "sqrtA")
             assert hasattr(first_eph, "toe")
             assert hasattr(first_eph, "week")
+
+    def test_mixed_gps_qzss_preserves_system_prefix(self):
+        """Mixed NAV should keep satellite IDs as Gxx/Jxx keys."""
+
+        def _line(values: list[float], prefix: str = "    ") -> str:
+            return prefix + "".join(f"{v:19.12E}".replace("E", "D") for v in values)
+
+        def _record(system_code: str, prn: int) -> list[str]:
+            first = (
+                f"{system_code}{prn:02d} 2026 06 13 10 00 00"
+                + f"{0.0:19.12E}".replace("E", "D")
+                + f"{0.0:19.12E}".replace("E", "D")
+                + f"{0.0:19.12E}".replace("E", "D")
+            )
+            return [
+                first,
+                _line([0.0, 0.0, 0.0, 0.0]),
+                _line([0.0, 0.01, 0.0, 5153.6]),
+                _line([0.0, 0.0, 0.0, 0.0]),
+                _line([0.0, 0.0, 0.0, 0.0]),
+                _line([0.0, 0.0, 0.0, 0.0]),
+                _line([0.0, 2397.0, 0.0, 0.0]),
+                _line([0.0, 0.0, 0.0, 0.0]),
+            ]
+
+        nav_text = (
+            "     3.05           N: GNSS NAV DATA    M                   RINEX VERSION / TYPE\n"
+            "                                                            END OF HEADER\n"
+            + "\n".join(_record("G", 10))
+            + "\n"
+            + "\n".join(_record("J", 1))
+            + "\n"
+        )
+
+        with tempfile.NamedTemporaryFile("w", suffix=".nav", delete=False) as tf:
+            tf.write(nav_text)
+            nav_path = tf.name
+
+        try:
+            ephemeris_dict, _ = read_rinex_nav(nav_path)
+        finally:
+            Path(nav_path).unlink(missing_ok=True)
+
+        assert "G10" in ephemeris_dict
+        assert "J01" in ephemeris_dict
+        assert len(ephemeris_dict["G10"]) == 1
+        assert len(ephemeris_dict["J01"]) == 1

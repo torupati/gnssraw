@@ -219,7 +219,7 @@ def read_rinex_nav(
     ephemerides: Dict[str, List[GPSEphemeris]] = {}
     ion_params: Dict[str, list[float]] = {}
 
-    with open(nav_file, "r") as f:
+    with open(nav_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     # Read header
@@ -253,14 +253,15 @@ def read_rinex_nav(
     while i < len(lines):
         line = lines[i]
 
-        # Process GPS satellite data only
-        if not line.startswith("G"):
+        # Process GPS and QZSS satellite data
+        if not (line.startswith("G") or line.startswith("J")):
             i += 1
             continue
 
         eph = GPSEphemeris()
 
         # Line 1: Satellite ID, time, clock correction parameters
+        system_code = line[0]
         prn = int(line[1:3])
         eph.prn = prn
         year = int(line[4:8])
@@ -322,12 +323,16 @@ def read_rinex_nav(
         if i < len(lines):
             line = lines[i]
             if len(line) > 61:
-                eph.tgd = float(line[42:61].replace("D", "E"))
+                tgd_str = line[42:61].strip()
+                if tgd_str:
+                    eph.tgd = float(tgd_str.replace("D", "E"))
             if len(line) > 80:
-                eph.iodc = float(line[61:80].replace("D", "E"))
+                iodc_str = line[61:80].strip()
+                if iodc_str:
+                    eph.iodc = float(iodc_str.replace("D", "E"))
 
-        # Add ephemeris to list
-        sat_id = f"G{prn:02d}"
+        # Add ephemeris to list (preserve constellation system code, e.g. G/J)
+        sat_id = f"{system_code}{prn:02d}"
         if sat_id not in ephemerides:
             ephemerides[sat_id] = []
         ephemerides[sat_id].append(eph)

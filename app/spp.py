@@ -104,7 +104,7 @@ def collect_measurements(
     """
     measurements = []
     for sat_id, sat_obs in epoch.iter_satellites():
-        if not sat_id.startswith("G"):
+        if not (sat_id.startswith("G") or sat_id.startswith("J")):
             continue
         if "L1" not in sat_obs.signals:
             continue
@@ -337,6 +337,12 @@ def main() -> int:
         default=None,
         help="Path to SQLite database file to save observations and solutions",
     )
+    parser.add_argument(
+        "--qzss-nav",
+        type=str,
+        default=None,
+        help="RINEX navigation file for QZSS (optional; merged with GPS nav data)",
+    )
 
     args = parser.parse_args()
     basicConfig(level=INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -346,6 +352,12 @@ def main() -> int:
     if not obs_path.exists() or not nav_path.exists():
         logger.error("Missing RINEX files: %s %s", obs_path, nav_path)
         return 1
+
+    if args.qzss_nav is not None:
+        qzss_nav_path = Path(args.qzss_nav)
+        if not qzss_nav_path.exists():
+            logger.error("QZSS navigation file not found: %s", qzss_nav_path)
+            return 1
 
     with Path(args.signal_code_map).open("r", encoding="utf-8") as f:
         signal_code_map = json.load(f)
@@ -358,6 +370,17 @@ def main() -> int:
     # Parse RINEX navigation file to read ephemeris data
     nav_data, ion_params = read_rinex_nav(str(nav_path))
 
+    # Merge QZSS navigation data if provided
+    if args.qzss_nav is not None:
+        qzss_nav_data, qzss_ion_params = read_rinex_nav(str(qzss_nav_path))
+        nav_data.update(qzss_nav_data)
+        # Use QZSS ionosphere params only if GPS ones are absent
+        for key, val in qzss_ion_params.items():
+            ion_params.setdefault(key, val)
+        logger.info(
+            "Loaded QZSS nav: %d satellites from %s", len(qzss_nav_data), qzss_nav_path
+        )
+
     logger.info("Ionosphere parameters from RINEX nav: %s", ion_params)
 
     ionosphere_manager = KlobucharManager()
@@ -367,6 +390,10 @@ def main() -> int:
         # Determine valid time (using the first epoch's time or a placeholder)
         time_of_data = epochs[0].datetime if epochs else datetime.utcnow()
         ionosphere_manager.add_model(time_of_data, model)
+    logger.info(
+        "Using ionosphere model: %s",
+        ionosphere_manager.get_model_for_time(epochs[0].datetime) if epochs else None,
+    )
 
     solutions = single_point_positioning(
         epochs, nav_data, ionosphere_manager=ionosphere_manager
@@ -387,6 +414,23 @@ def main() -> int:
     if args.database:
         db = GnssDatabase(args.database)
         db.save_epoch_observations(epochs)
+
+        for epoch in epochs:
+            _, sow = datetime_to_gps_week_seconds(epoch.datetime)
+            measurements = collect_measurements(epoch, nav_data, sow)
+            sat_positions: dict[str, dict[str, float | datetime | int]] = {}
+            for sat_id, sat_pos, dtsv, _sat_obs in measurements:
+                sat_positions[sat_id] = {
+                    "datetime": epoch.datetime,
+                    "nano_second": epoch.datetime.microsecond * 1000,
+                    "x": float(sat_pos[0]),
+                    "y": float(sat_pos[1]),
+                    "z": float(sat_pos[2]),
+                    "clock_bias": float(dtsv),
+                }
+            if sat_positions:
+                db.save_satellite_positions(sat_positions, epoch.datetime)
+
         for sol in solutions:
             db.save_spp_solution(
                 {

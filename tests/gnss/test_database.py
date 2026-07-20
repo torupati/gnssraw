@@ -258,6 +258,47 @@ def test_save_satellite_positions(temp_db, sample_epoch_observations):
     assert stats["num_satellite_positions"] == 2
 
 
+def test_save_qzss_satellite_position(temp_db):
+    """Test persisting satellite position for a QZSS satellite."""
+    dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    qzss_sat = SatelliteObservation(
+        prn=1,
+        signals={
+            "L1": SatelliteSignalObservation(
+                pseudorange=22000000.0,
+                carrier_phase=115000000.0,
+                doppler_=-1500.0,
+                snr=44.0,
+            )
+        },
+        ambiguities={},
+    )
+    epoch_obs = EpochObservations(
+        datetime=dt,
+        satellites_gps=[],
+        satellites_qzss=[qzss_sat],
+        satellites_galileo=[],
+        satellites_glonass=[],
+    )
+
+    temp_db.save_epoch_observations([epoch_obs])
+
+    positions = {
+        "J01": {
+            "datetime": dt,
+            "nano_second": 0,
+            "x": 1234.0,
+            "y": 5678.0,
+            "z": 91011.0,
+            "clock_bias": 1.0e-4,
+        }
+    }
+    temp_db.save_satellite_positions(positions, dt)
+
+    stats = temp_db.get_statistics()
+    assert stats["num_satellite_positions"] == 1
+
+
 def test_save_spp_solution(temp_db, sample_epoch_observations):
     """Test saving SPP solution."""
     temp_db.save_epoch_observations([sample_epoch_observations])
