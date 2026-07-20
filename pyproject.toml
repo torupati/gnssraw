@@ -9,6 +9,7 @@ authors = [
 ]
 dependencies = [
 	"georinex>=1.16.1",
+	"gnss-lib-py>=1.0.4",
 	"matplotlib>=3.7.1",
 	"pyrtcm>=1.1.10",
 	"sqlalchemy>=2.0.0",
