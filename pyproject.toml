@@ -8,10 +8,12 @@ authors = [
 	{ name = "torupa", email = "xpt77@outlook.com" }
 ]
 dependencies = [
+	"cartopy>=0.25.0",
 	"georinex>=1.16.1",
 	"gnss-lib-py>=1.0.4",
 	"matplotlib>=3.7.1",
 	"pyrtcm>=1.1.10",
+	"skyfield>=1.54",
 	"sqlalchemy>=2.0.0",
 ]
 
