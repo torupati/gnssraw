@@ -20,6 +20,7 @@ Epoch format: ISO 8601, e.g. 2027-01-15T06:30:00  (interpreted as UTC)
 from __future__ import annotations
 
 import argparse
+import math
 import urllib.parse
 from datetime import datetime, timezone
 
@@ -47,8 +48,6 @@ PROJECTIONS: dict[str, tuple[str, object]] = {
 
 # CelesTrak TLE base URL (no auth required)
 _CELESTRAK_BASE = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=TLE"
-
-# CelesTrak single-satellite lookup URLs
 _CELESTRAK_NAME_URL = (
     "https://celestrak.org/NORAD/elements/gp.php?NAME={name}&FORMAT=TLE"
 )
@@ -131,18 +130,7 @@ def fetch_satellites(constellation: str) -> tuple[list[EarthSatellite], object]:
 
 
 def fetch_satellite_by_spec(spec: str, ts) -> EarthSatellite:
-    """
-    Fetch a single satellite TLE from CelesTrak by name or NORAD catalog number.
-
-    Args:
-        spec: Satellite name (e.g. "STARLINK-1007") or NORAD ID (e.g. "44713").
-              Name lookup uses CelesTrak substring match; NORAD ID is exact.
-        ts: Skyfield timescale
-    Returns:
-        EarthSatellite (first match if multiple).
-    Raises:
-        ValueError: if no satellite is found.
-    """
+    """Fetch a single satellite TLE from CelesTrak by name or NORAD catalog number."""
     spec = spec.strip()
     if spec.isdigit():
         url = _CELESTRAK_CATNR_URL.format(catnr=spec)
@@ -161,9 +149,7 @@ def fetch_satellite_by_spec(spec: str, ts) -> EarthSatellite:
             "It may have de-orbited. Try a different name or NORAD ID."
         ) from exc
     if not satellites:
-        raise ValueError(
-            f"No satellite found for '{spec}'. Check the name or NORAD catalog number."
-        )
+        raise ValueError(f"No satellite found for '{spec}'.")
     if len(satellites) > 1:
         names = ", ".join(s.name for s in satellites[:5])
         suffix = "..." if len(satellites) > 5 else ""
@@ -175,14 +161,7 @@ def fetch_satellite_by_spec(spec: str, ts) -> EarthSatellite:
 
 
 def orbital_period_minutes(sat: EarthSatellite) -> float:
-    """
-    Compute the orbital period in minutes from the TLE mean motion.
-
-    Uses the Kozai mean motion stored in the SGP4 model (rad/min).
-    Accurate to within a few seconds for typical LEO/MEO satellites.
-    """
-    import math
-
+    """Compute orbital period in minutes from TLE mean motion."""
     return 2.0 * math.pi / sat.model.no_kozai
 
 
@@ -312,7 +291,7 @@ def _draw_satellite_tracks(
                 lat0 + 2.5,
                 sat.name,
                 transform=ccrs.Geodetic(),
-                fontsize=10 if single_color is None else 7,
+                fontsize=4.5,
                 color=color,
                 ha="center",
                 va="bottom",
@@ -359,6 +338,7 @@ def plot_orbits(
         fontsize=13,
         pad=10,
     )
+
     plt.tight_layout()
     if output_path:
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
