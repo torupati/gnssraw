@@ -1,11 +1,13 @@
-from pathlib import Path
-from io import BytesIO
-from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 import math
-import numpy as np
+from io import BytesIO
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
 import matplotlib.pyplot as plt
+import numpy as np
 from PIL import Image, UnidentifiedImageError
+
 from app.gnss.coordinates import ecef_to_enu_matrix
 from app.gnss.relative_positioning import (
     RelativePositionEpochResult,
@@ -51,24 +53,16 @@ _WEBMERC_R = 6378137.0
 _WEBMERC_ORIGIN_SHIFT = math.pi * _WEBMERC_R
 
 
-def _lonlat_to_tile_xy(
-    lon_deg: float, lat_deg: float, zoom: int
-) -> tuple[float, float]:
+def _lonlat_to_tile_xy(lon_deg: float, lat_deg: float, zoom: int) -> tuple[float, float]:
     lat_deg = max(min(lat_deg, 85.05112878), -85.05112878)
     n = 2**zoom
     xt = (lon_deg + 180.0) / 360.0 * n
     lat_rad = math.radians(lat_deg)
-    yt = (
-        (1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi)
-        / 2.0
-        * n
-    )
+    yt = (1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi) / 2.0 * n
     return xt, yt
 
 
-def _lonlat_to_webmerc(
-    lon_deg: np.ndarray, lat_deg: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def _lonlat_to_webmerc(lon_deg: np.ndarray, lat_deg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     lon_rad = np.radians(lon_deg)
     lat_clamped = np.clip(lat_deg, -85.05112878, 85.05112878)
     lat_rad = np.radians(lat_clamped)
@@ -121,12 +115,8 @@ def plot_track_on_background_maps(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    lats = np.array(
-        [r.rover_position_wgs84.lat_deg for r in epoch_results], dtype=float
-    )
-    lons = np.array(
-        [r.rover_position_wgs84.lon_deg for r in epoch_results], dtype=float
-    )
+    lats = np.array([r.rover_position_wgs84.lat_deg for r in epoch_results], dtype=float)
+    lons = np.array([r.rover_position_wgs84.lon_deg for r in epoch_results], dtype=float)
 
     lon_pad = 0.001
     lat_pad = 0.001
@@ -138,10 +128,10 @@ def plot_track_on_background_maps(
     tx0, ty0 = _lonlat_to_tile_xy(min_lon, max_lat, zoom)
     tx1, ty1 = _lonlat_to_tile_xy(max_lon, min_lat, zoom)
 
-    x_min = int(math.floor(min(tx0, tx1)))
-    x_max = int(math.floor(max(tx0, tx1)))
-    y_min = int(math.floor(min(ty0, ty1)))
-    y_max = int(math.floor(max(ty0, ty1)))
+    x_min = math.floor(min(tx0, tx1))
+    x_max = math.floor(max(tx0, tx1))
+    y_min = math.floor(min(ty0, ty1))
+    y_max = math.floor(max(ty0, ty1))
 
     tile_margin = 1
     x_min -= tile_margin

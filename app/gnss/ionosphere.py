@@ -1,6 +1,6 @@
-import numpy as np
 from datetime import datetime
-from typing import Optional
+
+import numpy as np
 
 from app.gnss.constants import CLIGHT
 from app.gnss.ephemeris import datetime_to_gps_week_seconds
@@ -100,15 +100,11 @@ class KlobucharModel:
         f = 1.0 + 16.0 * (0.53 - el_semi) ** 3
 
         # 7 & 9. Calculate amplitude and period (optimization using Horner's method)
-        amp = self.alpha[0] + phi_m * (
-            self.alpha[1] + phi_m * (self.alpha[2] + phi_m * self.alpha[3])
-        )
+        amp = self.alpha[0] + phi_m * (self.alpha[1] + phi_m * (self.alpha[2] + phi_m * self.alpha[3]))
         if amp < 0.0:
             amp = 0.0
 
-        per = self.beta[0] + phi_m * (
-            self.beta[1] + phi_m * (self.beta[2] + phi_m * self.beta[3])
-        )
+        per = self.beta[0] + phi_m * (self.beta[1] + phi_m * (self.beta[2] + phi_m * self.beta[3]))
         if per < 72000.0:
             per = 72000.0
 
@@ -145,7 +141,7 @@ class KlobucharManager:
         """
         self.models[time_of_data] = model
 
-    def get_model_for_time(self, obs_time: datetime) -> Optional[KlobucharModel]:
+    def get_model_for_time(self, obs_time: datetime) -> KlobucharModel | None:
         """
         Finds the closest Klobuchar model preceding the observation time.
         If no preceding model is found, returns the earliest available model.

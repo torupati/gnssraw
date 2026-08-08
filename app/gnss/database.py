@@ -12,23 +12,28 @@ minimal redundancy while maintaining query performance.
 import datetime as dt
 import json
 from pathlib import Path
-from typing import Optional, List
 
 from sqlalchemy import (
-    create_engine,
     ForeignKey,
     String,
     Text,
+    create_engine,
     event,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.orm import sessionmaker, relationship, Session
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Session,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
 
 from app.gnss.satellite_signals import (
+    AmbiguityObservation,
     EpochObservations,
     SatelliteObservation,
     SatelliteSignalObservation,
-    AmbiguityObservation,
 )
 
 
@@ -48,10 +53,8 @@ class Epoch(Base):
     datetime: Mapped[dt.datetime] = mapped_column(unique=True, index=True)
 
     # Relationships
-    satellites: Mapped[list["Satellite"]] = relationship(
-        back_populates="epoch", cascade="all, delete-orphan"
-    )
-    spp_solution: Mapped[Optional["SppSolution"]] = relationship(
+    satellites: Mapped[list["Satellite"]] = relationship(back_populates="epoch", cascade="all, delete-orphan")
+    spp_solution: Mapped["SppSolution | None"] = relationship(
         back_populates="epoch",
         cascade="all, delete-orphan",
     )
@@ -70,23 +73,15 @@ class Satellite(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     epoch_id: Mapped[int] = mapped_column(ForeignKey("epochs.id"), index=True)
-    satellite_id: Mapped[str] = mapped_column(
-        String(10), index=True
-    )  # e.g., "G01", "E05", "R10"
+    satellite_id: Mapped[str] = mapped_column(String(10), index=True)  # e.g., "G01", "E05", "R10"
     prn: Mapped[int] = mapped_column()
-    system: Mapped[str] = mapped_column(
-        String(10)
-    )  # "GPS", "QZSS", "Galileo", "GLONASS"
+    system: Mapped[str] = mapped_column(String(10))  # "GPS", "QZSS", "Galileo", "GLONASS"
 
     # Relationships
     epoch: Mapped["Epoch"] = relationship(back_populates="satellites")
-    signals: Mapped[list["Signal"]] = relationship(
-        back_populates="satellite", cascade="all, delete-orphan"
-    )
-    ambiguities: Mapped[list["Ambiguity"]] = relationship(
-        back_populates="satellite", cascade="all, delete-orphan"
-    )
-    position: Mapped[Optional["SatellitePosition"]] = relationship(
+    signals: Mapped[list["Signal"]] = relationship(back_populates="satellite", cascade="all, delete-orphan")
+    ambiguities: Mapped[list["Ambiguity"]] = relationship(back_populates="satellite", cascade="all, delete-orphan")
+    position: Mapped["SatellitePosition | None"] = relationship(
         back_populates="satellite",
         cascade="all, delete-orphan",
     )
@@ -132,8 +127,8 @@ class Ambiguity(Base):
     combination: Mapped[str] = mapped_column(String(20))  # e.g., "L1_L2", "L1_L5"
     widelane: Mapped[float] = mapped_column()  # in cycles
     ionofree: Mapped[float] = mapped_column()  # in cycles
-    geofree: Mapped[Optional[float]] = mapped_column(default=None)  # in cycles
-    multipath: Mapped[Optional[float]] = mapped_column(default=None)  # in meters
+    geofree: Mapped[float | None] = mapped_column(default=None)  # in cycles
+    multipath: Mapped[float | None] = mapped_column(default=None)  # in meters
 
     # Relationships
     satellite: Mapped["Satellite"] = relationship(back_populates="ambiguities")
@@ -151,19 +146,13 @@ class SatellitePosition(Base):
     __tablename__ = "satellite_positions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    satellite_id: Mapped[int] = mapped_column(
-        ForeignKey("satellites.id"), unique=True, index=True
-    )
+    satellite_id: Mapped[int] = mapped_column(ForeignKey("satellites.id"), unique=True, index=True)
     datetime: Mapped[dt.datetime] = mapped_column(index=True)  # Observation time (UTC)
-    nano_second: Mapped[int] = mapped_column(
-        default=0
-    )  # Sub-second value in nanoseconds
+    nano_second: Mapped[int] = mapped_column(default=0)  # Sub-second value in nanoseconds
     x: Mapped[float] = mapped_column()  # ECEF X coordinate in meters
     y: Mapped[float] = mapped_column()  # ECEF Y coordinate in meters
     z: Mapped[float] = mapped_column()  # ECEF Z coordinate in meters
-    clock_bias: Mapped[Optional[float]] = mapped_column(
-        default=None
-    )  # Satellite clock bias in seconds
+    clock_bias: Mapped[float | None] = mapped_column(default=None)  # Satellite clock bias in seconds
 
     # Relationships
     satellite: Mapped["Satellite"] = relationship(back_populates="position")
@@ -181,9 +170,7 @@ class SppSolution(Base):
     __tablename__ = "spp_solutions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    epoch_id: Mapped[int] = mapped_column(
-        ForeignKey("epochs.id"), unique=True, index=True
-    )
+    epoch_id: Mapped[int] = mapped_column(ForeignKey("epochs.id"), unique=True, index=True)
 
     # ECEF coordinates
     x: Mapped[float] = mapped_column()  # ECEF X coordinate in meters
@@ -200,9 +187,7 @@ class SppSolution(Base):
 
     # Solution quality
     num_satellites: Mapped[int] = mapped_column()
-    residuals: Mapped[Optional[str]] = mapped_column(
-        Text, default=None
-    )  # JSON array of residuals
+    residuals: Mapped[str | None] = mapped_column(Text, default=None)  # JSON array of residuals
 
     # Relationships
     epoch: Mapped["Epoch"] = relationship(back_populates="spp_solution")
@@ -247,9 +232,7 @@ class GnssDatabase:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def save_epoch_observations(
-        self, observations: List[EpochObservations], session: Optional[Session] = None
-    ) -> None:
+    def save_epoch_observations(self, observations: list[EpochObservations], session: Session | None = None) -> None:
         """Save a list of EpochObservations to the database.
 
         Args:
@@ -272,9 +255,7 @@ class GnssDatabase:
             if close_session:
                 session.close()
 
-    def _save_single_epoch(
-        self, session: Session, epoch_obs: EpochObservations
-    ) -> Epoch:
+    def _save_single_epoch(self, session: Session, epoch_obs: EpochObservations) -> Epoch:
         """Save a single EpochObservations to the database.
 
         Args:
@@ -285,9 +266,7 @@ class GnssDatabase:
             Created Epoch object
         """
         # Check if epoch already exists
-        existing_epoch = (
-            session.query(Epoch).filter_by(datetime=epoch_obs.datetime).first()
-        )
+        existing_epoch = session.query(Epoch).filter_by(datetime=epoch_obs.datetime).first()
         if existing_epoch:
             # Delete existing epoch (cascade will delete related data)
             session.delete(existing_epoch)
@@ -304,9 +283,7 @@ class GnssDatabase:
 
         return epoch
 
-    def _save_satellite(
-        self, session: Session, epoch: Epoch, sat_id: str, sat_obs: SatelliteObservation
-    ) -> Satellite:
+    def _save_satellite(self, session: Session, epoch: Epoch, sat_id: str, sat_obs: SatelliteObservation) -> Satellite:
         """Save a single SatelliteObservation to the database.
 
         Args:
@@ -364,10 +341,10 @@ class GnssDatabase:
 
     def load_epoch_observations(
         self,
-        start_datetime: Optional[dt.datetime] = None,
-        end_datetime: Optional[dt.datetime] = None,
-        session: Optional[Session] = None,
-    ) -> List[EpochObservations]:
+        start_datetime: dt.datetime | None = None,
+        end_datetime: dt.datetime | None = None,
+        session: Session | None = None,
+    ) -> list[EpochObservations]:
         """Load EpochObservations from the database.
 
         Args:
@@ -439,9 +416,7 @@ class GnssDatabase:
             satellites_glonass=satellites_glonass,
         )
 
-    def _load_satellite(
-        self, session: Session, satellite: Satellite
-    ) -> SatelliteObservation:
+    def _load_satellite(self, session: Session, satellite: Satellite) -> SatelliteObservation:
         """Load a single SatelliteObservation from the database.
 
         Args:
@@ -466,9 +441,7 @@ class GnssDatabase:
                 widelane=ambiguity.widelane,
                 ionofree=ambiguity.ionofree,
                 geofree=ambiguity.geofree if ambiguity.geofree is not None else 0.0,
-                multipath=ambiguity.multipath
-                if ambiguity.multipath is not None
-                else 0.0,
+                multipath=ambiguity.multipath if ambiguity.multipath is not None else 0.0,
             )
 
         return SatelliteObservation(
@@ -481,7 +454,7 @@ class GnssDatabase:
         self,
         positions: dict[str, dict],
         epoch_datetime: dt.datetime,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> None:
         """Save satellite positions for a specific epoch.
 
@@ -503,21 +476,13 @@ class GnssDatabase:
                 raise ValueError(f"Epoch not found: {epoch_datetime}")
 
             for sat_id, pos_data in positions.items():
-                satellite = (
-                    session.query(Satellite)
-                    .filter_by(epoch_id=epoch.id, satellite_id=sat_id)
-                    .first()
-                )
+                satellite = session.query(Satellite).filter_by(epoch_id=epoch.id, satellite_id=sat_id).first()
 
                 if not satellite:
                     continue  # Skip if satellite not found
 
                 # Check if position already exists
-                existing_pos = (
-                    session.query(SatellitePosition)
-                    .filter_by(satellite_id=satellite.id)
-                    .first()
-                )
+                existing_pos = session.query(SatellitePosition).filter_by(satellite_id=satellite.id).first()
 
                 if existing_pos:
                     # Update existing position
@@ -552,7 +517,7 @@ class GnssDatabase:
         self,
         solution_data: dict,
         epoch_datetime: dt.datetime,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> None:
         """Save SPP solution for a specific epoch.
 
@@ -577,9 +542,7 @@ class GnssDatabase:
                 raise ValueError(f"Epoch not found: {epoch_datetime}")
 
             # Check if solution already exists
-            existing_sol = (
-                session.query(SppSolution).filter_by(epoch_id=epoch.id).first()
-            )
+            existing_sol = session.query(SppSolution).filter_by(epoch_id=epoch.id).first()
 
             residuals_json = None
             if "residuals" in solution_data and solution_data["residuals"] is not None:
@@ -624,7 +587,7 @@ class GnssDatabase:
             if close_session:
                 session.close()
 
-    def get_statistics(self, session: Optional[Session] = None) -> dict:
+    def get_statistics(self, session: Session | None = None) -> dict:
         """Get database statistics.
 
         Args:
@@ -655,16 +618,14 @@ class GnssDatabase:
             if first_epoch and last_epoch:
                 stats["first_epoch"] = first_epoch.datetime
                 stats["last_epoch"] = last_epoch.datetime
-                stats["time_span"] = (
-                    last_epoch.datetime - first_epoch.datetime
-                ).total_seconds()
+                stats["time_span"] = (last_epoch.datetime - first_epoch.datetime).total_seconds()
 
             return stats
         finally:
             if close_session:
                 session.close()
 
-    def clear_database(self, session: Optional[Session] = None) -> None:
+    def clear_database(self, session: Session | None = None) -> None:
         """Clear all data from the database.
 
         Args:

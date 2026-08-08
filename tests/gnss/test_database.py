@@ -3,8 +3,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
-import pytest
 import numpy as np
+import pytest
 
 from app.gnss.database import GnssDatabase
 from app.gnss.satellite_signals import (

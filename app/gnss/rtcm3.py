@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from pyrtcm import RTCMReader
 
+from .constants import CLIGHT, GPS_EPOCH, wlen_L1, wlen_L2, wlen_L5, wlen_L7, wlen_L8
 from .satellite_signals import (
     EpochObservations,
     SatelliteObservation,
     SatelliteSignalObservation,
 )
-from .constants import CLIGHT, wlen_L1, wlen_L2, wlen_L5, wlen_L7, wlen_L8
-from .constants import GPS_EPOCH
 
 
 def _get_attr(msg, *names):
@@ -142,17 +141,9 @@ def parse_rtcm_msm7_signal_observations(msg):
     # Build map: PRN -> (rough_range, rough_range_mod, rough_rate)
     rough_by_prn = {}
     for sat_idx, prn in enumerate(prn_list):
-        rough = (
-            float(rough_range_list[sat_idx]) if sat_idx < len(rough_range_list) else 0.0
-        )
-        rough_mod = (
-            float(rough_range_mod_list[sat_idx])
-            if sat_idx < len(rough_range_mod_list)
-            else 0.0
-        )
-        rough_rate = (
-            float(rough_rate_list[sat_idx]) if sat_idx < len(rough_rate_list) else 0.0
-        )
+        rough = float(rough_range_list[sat_idx]) if sat_idx < len(rough_range_list) else 0.0
+        rough_mod = float(rough_range_mod_list[sat_idx]) if sat_idx < len(rough_range_mod_list) else 0.0
+        rough_rate = float(rough_rate_list[sat_idx]) if sat_idx < len(rough_rate_list) else 0.0
         rough_by_prn[int(prn)] = (rough, rough_mod, rough_rate)
 
     count = min(
@@ -168,12 +159,8 @@ def parse_rtcm_msm7_signal_observations(msg):
     if count == 0:
         cells = _iter_msm_cells(msg)
         pr_list = _ensure_list(_get_attr(msg, "fine_pseudorange", "pseudorange", "pr"))
-        cp_list = _ensure_list(
-            _get_attr(msg, "fine_phaserange", "phaserange", "carrier_phase", "cp")
-        )
-        dp_list = _ensure_list(
-            _get_attr(msg, "phaserange_rate", "phaserate", "doppler", "rate")
-        )
+        cp_list = _ensure_list(_get_attr(msg, "fine_phaserange", "phaserange", "carrier_phase", "cp"))
+        dp_list = _ensure_list(_get_attr(msg, "phaserange_rate", "phaserate", "doppler", "rate"))
         cnr_list = _ensure_list(_get_attr(msg, "cnr", "snr", "CNR"))
         count = min(
             len(cells),
@@ -200,9 +187,7 @@ def parse_rtcm_msm7_signal_observations(msg):
         sat = int(cell_prn[idx])
         sig = str(cell_sig[idx])
         wavelength = _signal_wavelength(sig)
-        rough_range_ms, rough_mod_ms, rough_rate = rough_by_prn.get(
-            sat, (0.0, 0.0, 0.0)
-        )
+        rough_range_ms, rough_mod_ms, rough_rate = rough_by_prn.get(sat, (0.0, 0.0, 0.0))
         rough_range_m = (rough_range_ms + rough_mod_ms) * 1e-3 * CLIGHT
         pseudorange_m = rough_range_m + float(pr_list[idx]) * 0.0001
 
@@ -275,16 +260,10 @@ def read_rtcm3_file(rtcm_path: Path, gps_week_number: int) -> list[EpochObservat
                 continue
 
             # Get TOW: DF004 for GPS, DF248 for Galileo, DF428 for QZSS
-            tow_ms = (
-                _get_attr(msg, "DF004")
-                or _get_attr(msg, "DF248")
-                or _get_attr(msg, "DF428")
-            )
+            tow_ms = _get_attr(msg, "DF004") or _get_attr(msg, "DF248") or _get_attr(msg, "DF428")
 
             # Parse observations
-            observations: list[tuple[int, str, SatelliteSignalObservation]] = (
-                parse_rtcm_msm7_signal_observations(msg)
-            )
+            observations: list[tuple[int, str, SatelliteSignalObservation]] = parse_rtcm_msm7_signal_observations(msg)
             if not observations:
                 continue
 
@@ -297,9 +276,7 @@ def read_rtcm3_file(rtcm_path: Path, gps_week_number: int) -> list[EpochObservat
                 except (TypeError, ValueError):
                     epoch_dt = None
             if epoch_dt is None:
-                epoch_dt = datetime.fromtimestamp(0, tz=timezone.utc).replace(
-                    tzinfo=None
-                )
+                epoch_dt = datetime.fromtimestamp(0, tz=timezone.utc).replace(tzinfo=None)
 
             # Group observations by satellite
             satellites = group_observations_by_satellite(observations)
@@ -307,12 +284,7 @@ def read_rtcm3_file(rtcm_path: Path, gps_week_number: int) -> list[EpochObservat
             # Check if this timestamp matches the buffered epoch
             current_tow = int(tow_ms) if tow_ms is not None else None
 
-            if (
-                current_tow is not None
-                and last_tow is not None
-                and current_tow == last_tow
-                and buffered_epoch is not None
-            ):
+            if current_tow is not None and last_tow is not None and current_tow == last_tow and buffered_epoch is not None:
                 # Same TOW: merge into buffered epoch
                 if identity == "1077":
                     buffered_epoch.satellites_gps.extend(satellites)

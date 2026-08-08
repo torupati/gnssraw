@@ -1,8 +1,9 @@
 import argparse
 import json
-from pathlib import Path
-from logging import getLogger, basicConfig, INFO
+import sys
 from collections import defaultdict
+from logging import INFO, basicConfig, getLogger
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 
@@ -28,9 +29,7 @@ def _load_satpair_json(path: Path) -> list[dict]:
         data = json.load(f)
 
     if isinstance(data, list):
-        return [
-            {"sat1": item[0], "sat2": item[1], "combinations": None} for item in data
-        ]
+        return [{"sat1": item[0], "sat2": item[1], "combinations": None} for item in data]
 
     if not isinstance(data, dict):
         raise ValueError("satpair JSON must be a list or an object")
@@ -86,11 +85,7 @@ def _load_satpair_json(path: Path) -> list[dict]:
             {
                 "sat1": str(pair[0]),
                 "sat2": str(pair[1]),
-                "combinations": (
-                    [str(item) for item in combinations]
-                    if combinations is not None
-                    else None
-                ),
+                "combinations": ([str(item) for item in combinations] if combinations is not None else None),
             }
         )
 
@@ -134,28 +129,14 @@ def _collect_satellite_data(epochs: list[EpochObservations]) -> dict[str, dict]:
                         "values": [],
                     }
 
-                satellite_data[sat_id]["pseudorange"][band_name]["times"].append(
-                    epoch.datetime
-                )
-                satellite_data[sat_id]["pseudorange"][band_name]["values"].append(
-                    signal_obs.pseudorange
-                )
-                satellite_data[sat_id]["carrier_phase"][band_name]["times"].append(
-                    epoch.datetime
-                )
-                satellite_data[sat_id]["carrier_phase"][band_name]["values"].append(
-                    signal_obs.carrier_phase
-                )
-                satellite_data[sat_id]["doppler"][band_name]["times"].append(
-                    epoch.datetime
-                )
-                satellite_data[sat_id]["doppler"][band_name]["values"].append(
-                    signal_obs.doppler_
-                )
+                satellite_data[sat_id]["pseudorange"][band_name]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["pseudorange"][band_name]["values"].append(signal_obs.pseudorange)
+                satellite_data[sat_id]["carrier_phase"][band_name]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["carrier_phase"][band_name]["values"].append(signal_obs.carrier_phase)
+                satellite_data[sat_id]["doppler"][band_name]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["doppler"][band_name]["values"].append(signal_obs.doppler_)
                 satellite_data[sat_id]["snr"][band_name]["times"].append(epoch.datetime)
-                satellite_data[sat_id]["snr"][band_name]["values"].append(
-                    signal_obs.snr
-                )
+                satellite_data[sat_id]["snr"][band_name]["values"].append(signal_obs.snr)
 
             for comb_name, amb_obs in sat_obs.ambiguities.items():
                 if comb_name not in satellite_data[sat_id]["ambiguities"]:
@@ -163,27 +144,13 @@ def _collect_satellite_data(epochs: list[EpochObservations]) -> dict[str, dict]:
                         "widelane": {"times": [], "values": []},
                         "ionofree": {"times": [], "values": []},
                     }
-                satellite_data[sat_id]["ambiguities"][comb_name]["widelane"][
-                    "times"
-                ].append(epoch.datetime)
-                satellite_data[sat_id]["ambiguities"][comb_name]["widelane"][
-                    "values"
-                ].append(amb_obs.widelane)
-                satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"][
-                    "times"
-                ].append(epoch.datetime)
-                satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"][
-                    "values"
-                ].append(amb_obs.ionofree)
-                satellite_data[sat_id]["ambiguities"][comb_name].setdefault(
-                    "geofree", {"times": [], "values": []}
-                )
-                satellite_data[sat_id]["ambiguities"][comb_name]["geofree"][
-                    "times"
-                ].append(epoch.datetime)
-                satellite_data[sat_id]["ambiguities"][comb_name]["geofree"][
-                    "values"
-                ].append(amb_obs.geofree)
+                satellite_data[sat_id]["ambiguities"][comb_name]["widelane"]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["ambiguities"][comb_name]["widelane"]["values"].append(amb_obs.widelane)
+                satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"]["values"].append(amb_obs.ionofree)
+                satellite_data[sat_id]["ambiguities"][comb_name].setdefault("geofree", {"times": [], "values": []})
+                satellite_data[sat_id]["ambiguities"][comb_name]["geofree"]["times"].append(epoch.datetime)
+                satellite_data[sat_id]["ambiguities"][comb_name]["geofree"]["values"].append(amb_obs.geofree)
 
     return satellite_data
 
@@ -236,9 +203,7 @@ def plot_paired_satellite_observations(
                 all_times.extend(comb_data["ionofree"]["times"])
                 all_times.extend(comb_data.get("geofree", {}).get("times", []))
 
-        num_ambiguity_combos = len(
-            set(data_left["ambiguities"].keys()) | set(data_right["ambiguities"].keys())
-        )
+        num_ambiguity_combos = len(set(data_left["ambiguities"].keys()) | set(data_right["ambiguities"].keys()))
         has_ambiguity = num_ambiguity_combos > 0
 
         show_basic = plot_mode in {1, 4}
@@ -291,12 +256,8 @@ def plot_paired_satellite_observations(
             ax.grid(True)
 
         if show_basic:
-            plot_band_row(
-                axes[plot_idx][0], data_left, "pseudorange", "Pseudorange (m)"
-            )
-            plot_band_row(
-                axes[plot_idx][1], data_right, "pseudorange", "Pseudorange (m)"
-            )
+            plot_band_row(axes[plot_idx][0], data_left, "pseudorange", "Pseudorange (m)")
+            plot_band_row(axes[plot_idx][1], data_right, "pseudorange", "Pseudorange (m)")
             plot_idx += 1
 
             plot_band_row(
@@ -326,10 +287,7 @@ def plot_paired_satellite_observations(
 
         if has_ambiguity:
             colors = ["purple", "orange", "green", "red", "blue", "brown"]
-            all_combos = sorted(
-                set(data_left["ambiguities"].keys())
-                | set(data_right["ambiguities"].keys())
-            )
+            all_combos = sorted(set(data_left["ambiguities"].keys()) | set(data_right["ambiguities"].keys()))
             for comb_idx, comb_name in enumerate(all_combos):
                 color_wl = colors[comb_idx * 2 % len(colors)]
                 color_if = colors[(comb_idx * 2 + 1) % len(colors)]
@@ -545,9 +503,7 @@ def _print_common_non_l1_signals(paired_epochs: list[PairedObservation]):
         ref_map = _build_satellite_signal_map(pair.ref_observation)
         common_sats = sorted(set(obs_map.keys()) & set(ref_map.keys()))
 
-        print(
-            f"{pair.time_str} | ref {pair.ref_observation.datetime.strftime('%Y-%m-%d %H:%M:%S')} | dt={pair.age_seconds:+.3f}s"
-        )
+        print(f"{pair.time_str} | ref {pair.ref_observation.datetime.strftime('%Y-%m-%d %H:%M:%S')} | dt={pair.age_seconds:+.3f}s")
         any_found = False
         for sat_id in common_sats:
             common_signals = (obs_map[sat_id] & ref_map[sat_id]) - {"L1"}
@@ -599,17 +555,11 @@ def _print_combined_ambiguity_stats(paired_epochs: list[PairedObservation]):
         if_values = stats[(sat1, sat2, comb)]["ionofree"]
         wl_mean, wl_var = _calc_mean_variance(wl_values)
         if_mean, if_var = _calc_mean_variance(if_values)
-        print(
-            f"  {sat1}-{sat2} {comb} | "
-            f"WL mean={wl_mean:.6f} var={wl_var:.6f} n={len(wl_values)} | "
-            f"IF mean={if_mean:.6f} var={if_var:.6f} n={len(if_values)}"
-        )
+        print(f"  {sat1}-{sat2} {comb} | WL mean={wl_mean:.6f} var={wl_var:.6f} n={len(wl_values)} | IF mean={if_mean:.6f} var={if_var:.6f} n={len(if_values)}")
 
 
 def _print_epoch_ambiguity_stats(label: str, epochs: list[EpochObservations]):
-    stats: dict[tuple[str, str], dict[str, list[float]]] = defaultdict(
-        lambda: {"widelane": [], "ionofree": []}
-    )
+    stats: dict[tuple[str, str], dict[str, list[float]]] = defaultdict(lambda: {"widelane": [], "ionofree": []})
 
     for epoch in epochs:
         for sat_id, sat_obs in epoch.iter_satellites():
@@ -629,17 +579,11 @@ def _print_epoch_ambiguity_stats(label: str, epochs: list[EpochObservations]):
         if_values = stats[(sat_id, comb_name)]["ionofree"]
         wl_mean, wl_var = _calc_mean_variance(wl_values)
         if_mean, if_var = _calc_mean_variance(if_values)
-        print(
-            f"  {sat_id} {comb_name} | "
-            f"WL mean={wl_mean:.6f} var={wl_var:.6f} n={len(wl_values)} | "
-            f"IF mean={if_mean:.6f} var={if_var:.6f} n={len(if_values)}"
-        )
+        print(f"  {sat_id} {comb_name} | WL mean={wl_mean:.6f} var={wl_var:.6f} n={len(wl_values)} | IF mean={if_mean:.6f} var={if_var:.6f} n={len(if_values)}")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Pair RINEX observation files and list common non-L1 signals"
-    )
+    parser = argparse.ArgumentParser(description="Pair RINEX observation files and list common non-L1 signals")
     parser.add_argument("rinex_obs", type=str, help="Path to input RINEX file")
     parser.add_argument("rinex_ref", type=str, help="Path to reference RINEX file")
     parser.add_argument(
@@ -653,10 +597,7 @@ def main():
         type=int,
         choices=[1, 2, 3, 4],
         default=1,
-        help=(
-            "Plot data selection: 1=all, 2=SNR+widelane only, "
-            "3=SNR+widelane+ionofree only, 4=PR+CP+Doppler+SNR only"
-        ),
+        help=("Plot data selection: 1=all, 2=SNR+widelane only, 3=SNR+widelane+ionofree only, 4=PR+CP+Doppler+SNR only"),
     )
     parser.add_argument(
         "--skip-plot",
@@ -679,19 +620,13 @@ def main():
         "--signal-code-map",
         type=str,
         default=str(Path(__file__).parent / ".signal_code_map.json"),
-        help=(
-            "Path to JSON file that defines signal_code_map of input RINEX file"
-            "(default: .signal_code_map.json)"
-        ),
+        help=("Path to JSON file that defines signal_code_map of input RINEX file(default: .signal_code_map.json)"),
     )
     parser.add_argument(
         "--signal-code-map-ref",
         type=str,
         default=str(Path(__file__).parent / ".signal_code_map.json"),
-        help=(
-            "Path to JSON file that defines signal_code_map of reference RINEX file"
-            "(default: .signal_code_map.json)"
-        ),
+        help=("Path to JSON file that defines signal_code_map of reference RINEX file(default: .signal_code_map.json)"),
     )
 
     args = parser.parse_args()
@@ -707,9 +642,7 @@ def main():
         with signal_code_map_path.open("r", encoding="utf-8") as f:
             signal_code_map = json.load(f)
     except json.JSONDecodeError as exc:
-        logger.error(
-            f"Invalid JSON in signal code map file: {signal_code_map_path} ({exc})"
-        )
+        logger.error(f"Invalid JSON in signal code map file: {signal_code_map_path} ({exc})")
         return 1
 
     signal_code_map_ref_path = Path(args.signal_code_map_ref)
@@ -720,9 +653,7 @@ def main():
         with signal_code_map_ref_path.open("r", encoding="utf-8") as f:
             signal_code_map_ref = json.load(f)
     except json.JSONDecodeError as exc:
-        logger.error(
-            f"Invalid JSON in signal code map file: {signal_code_map_ref_path} ({exc})"
-        )
+        logger.error(f"Invalid JSON in signal code map file: {signal_code_map_ref_path} ({exc})")
         return 1
 
     # Load paring setting
@@ -747,20 +678,12 @@ def main():
         return 1
 
     logger.info(f"... input RINEX file: {rinex_path}")
-    epochs: list[EpochObservations] = parse_rinex_observation_file(
-        str(rinex_path), signal_code_map
-    )
-    logger.info(
-        f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}"
-    )
+    epochs: list[EpochObservations] = parse_rinex_observation_file(str(rinex_path), signal_code_map)
+    logger.info(f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}")
 
     logger.info(f"... reference RINEX file: {ref_path}")
-    ref_epochs: list[EpochObservations] = parse_rinex_observation_file(
-        str(ref_path), signal_code_map_ref
-    )
-    logger.info(
-        f"... parsed {len(ref_epochs)} epochs. {ref_epochs[0].datetime if ref_epochs else 'N/A'} to {ref_epochs[-1].datetime if ref_epochs else 'N/A'}"
-    )
+    ref_epochs: list[EpochObservations] = parse_rinex_observation_file(str(ref_path), signal_code_map_ref)
+    logger.info(f"... parsed {len(ref_epochs)} epochs. {ref_epochs[0].datetime if ref_epochs else 'N/A'} to {ref_epochs[-1].datetime if ref_epochs else 'N/A'}")
 
     if not epochs or not ref_epochs:
         logger.error("Input or reference epochs are empty")
@@ -798,4 +721,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

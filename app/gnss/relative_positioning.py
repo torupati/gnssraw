@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import csv
 import datetime as dt
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -54,9 +54,7 @@ class RelativePositionEpochResult:
         }
 
 
-def write_relative_position_results_csv(
-    results: list[RelativePositionEpochResult], output_path: Path
-) -> None:
+def write_relative_position_results_csv(results: list[RelativePositionEpochResult], output_path: Path) -> None:
     """Write relative positioning results to CSV.
 
     Latitude/longitude are formatted with 9 decimal places, and heights with 4.

@@ -5,29 +5,29 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime
-from logging import getLogger, basicConfig, INFO
+from datetime import datetime, timezone
+from logging import INFO, basicConfig, getLogger
 from pathlib import Path
 
 import numpy as np
 
 from app.gnss.constants import CLIGHT
 from app.gnss.coordinates import ecef_to_enu_matrix, ecef_to_llh
-from app.gnss.troposphere import tropospheric_delay
+from app.gnss.database import GnssDatabase
 from app.gnss.ephemeris import (
-    read_rinex_nav,
-    compute_satellite_state,
-    GPSEphemeris,
-    datetime_to_gps_week_seconds,
     OMEGA_E,
+    GPSEphemeris,
+    compute_satellite_state,
+    datetime_to_gps_week_seconds,
+    read_rinex_nav,
 )
+from app.gnss.ionosphere import KlobucharManager, KlobucharModel
 from app.gnss.satellite_signals import (
     EpochObservations,
     SatelliteObservation,
     parse_rinex_observation_file,
 )
-from app.gnss.ionosphere import KlobucharManager, KlobucharModel
-from app.gnss.database import GnssDatabase
+from app.gnss.troposphere import tropospheric_delay
 
 logger = getLogger(__name__)
 
@@ -52,14 +52,10 @@ def select_ephemeris(
     if not messages:
         raise ValueError(f"No ephemeris available for satellite {sv}")
     # Return the ephemeris with the closest toe to sow
-    return min(
-        messages, key=lambda msg: abs((sow - msg.toe + 302400) % 604800 - 302400)
-    )
+    return min(messages, key=lambda msg: abs((sow - msg.toe + 302400) % 604800 - 302400))
 
 
-def apply_earth_rotation_correction(
-    sat_pos: np.ndarray, travel_time: float
-) -> np.ndarray:
+def apply_earth_rotation_correction(sat_pos: np.ndarray, travel_time: float) -> np.ndarray:
     """
     Apply Earth rotation correction to satellite position.
 
@@ -119,7 +115,7 @@ def collect_measurements(
 
         try:
             sat_pos, dtsv = compute_satellite_state(nav, epoch.datetime, pr)
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             logger.warning("Failed to compute satellite state for %s: %s", sat_id, e)
             continue
         if not np.all(np.isfinite(sat_pos)) or not np.isfinite(dtsv):
@@ -212,9 +208,7 @@ def build_observation_matrix(
         iono = 0.0
         if iono_model is not None:
             if elev > 0 and iono_model is not None:
-                iono_val = iono_model.calculate_delay(
-                    epoch_dt, receiver_llh_rad, az, elev
-                )
+                iono_val = iono_model.calculate_delay(epoch_dt, receiver_llh_rad, az, elev)
                 if np.isfinite(iono_val):
                     iono = iono_val
                     logger.debug(
@@ -377,9 +371,7 @@ def main() -> int:
         # Use QZSS ionosphere params only if GPS ones are absent
         for key, val in qzss_ion_params.items():
             ion_params.setdefault(key, val)
-        logger.info(
-            "Loaded QZSS nav: %d satellites from %s", len(qzss_nav_data), qzss_nav_path
-        )
+        logger.info("Loaded QZSS nav: %d satellites from %s", len(qzss_nav_data), qzss_nav_path)
 
     logger.info("Ionosphere parameters from RINEX nav: %s", ion_params)
 
@@ -388,16 +380,14 @@ def main() -> int:
         model = KlobucharModel(ion_params["ion_alpha"], ion_params["ion_beta"])
 
         # Determine valid time (using the first epoch's time or a placeholder)
-        time_of_data = epochs[0].datetime if epochs else datetime.utcnow()
+        time_of_data = epochs[0].datetime if epochs else datetime.now(tz=timezone.utc)
         ionosphere_manager.add_model(time_of_data, model)
     logger.info(
         "Using ionosphere model: %s",
         ionosphere_manager.get_model_for_time(epochs[0].datetime) if epochs else None,
     )
 
-    solutions = single_point_positioning(
-        epochs, nav_data, ionosphere_manager=ionosphere_manager
-    )
+    solutions = single_point_positioning(epochs, nav_data, ionosphere_manager=ionosphere_manager)
 
     for sol in solutions:
         lat, lon, h = sol.position_llh
@@ -438,9 +428,7 @@ def main() -> int:
                     "position_llh": sol.position_llh.tolist(),
                     "clock_bias_m": sol.clock_bias_m,
                     "num_satellites": sol.num_sats,
-                    "residuals": sol.residuals.tolist()
-                    if sol.residuals.size > 0
-                    else None,
+                    "residuals": sol.residuals.tolist() if sol.residuals.size > 0 else None,
                 },
                 sol.datetime,
             )

@@ -8,9 +8,12 @@ authors = [
 	{ name = "torupa", email = "xpt77@outlook.com" }
 ]
 dependencies = [
+	"cartopy>=0.25.0",
 	"georinex>=1.16.1",
+	"gnss-lib-py>=1.0.4",
 	"matplotlib>=3.7.1",
 	"pyrtcm>=1.1.10",
+	"skyfield>=1.54",
 	"sqlalchemy>=2.0.0",
 ]
 
@@ -52,5 +55,14 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.ruff]
-# Exclude misc utilities from linting
-exclude = ["misc"]
+exclude = ["doc", "misc", "tests"]
+line-length = 160
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "RUF",  # ruff-specific rules (e.g. RUF022 unsorted __all__)
+    "UP",   # pyupgrade (e.g. UP035 deprecated typing, UP045 Optional->X|None)
+]

@@ -9,16 +9,16 @@ from pathlib import Path
 
 import numpy as np
 
-from app.gnss.database import GnssDatabase, Epoch
 from app.gnss.coordinates import ecef_to_llh
+from app.gnss.database import Epoch, GnssDatabase
+from app.gnss.plot.position_plot import (
+    plot_enu_time_series,
+    plot_track_on_background_maps,
+)
 from app.gnss.relative_positioning import (
     RelativePositionEpochResult,
     Wgs84Position,
     write_relative_position_results_csv,
-)
-from app.gnss.plot.position_plot import (
-    plot_enu_time_series,
-    plot_track_on_background_maps,
 )
 
 
@@ -27,9 +27,7 @@ def parse_datetime(value: str) -> dt.datetime:
     try:
         return dt.datetime.fromisoformat(value)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            f"Invalid datetime format: {value}. Use YYYY-MM-DD HH:MM:SS"
-        ) from exc
+        raise argparse.ArgumentTypeError(f"Invalid datetime format: {value}. Use YYYY-MM-DD HH:MM:SS") from exc
 
 
 def block_doble_differencing_matrix(
@@ -64,9 +62,7 @@ def load_epoch_data(
     epoch_dt: dt.datetime,
     sat_ids: list[str],
     bands: list[str],
-) -> tuple[
-    dict[str, np.ndarray], dict[str, dict[str, dict[str, float]]], np.ndarray | None
-]:
+) -> tuple[dict[str, np.ndarray], dict[str, dict[str, dict[str, float]]], np.ndarray | None]:
     """Load satellite positions and selected-band observations for one epoch."""
     db = GnssDatabase(db_path)
     satpos: dict[str, np.ndarray] = {}
@@ -88,9 +84,7 @@ def load_epoch_data(
             if sid not in sat_ids:
                 continue
             if sat.position is not None:
-                satpos[sid] = np.array(
-                    [sat.position.x, sat.position.y, sat.position.z], dtype=float
-                )
+                satpos[sid] = np.array([sat.position.x, sat.position.y, sat.position.z], dtype=float)
             obs[sid] = {
                 sig.band: {
                     "code_range": float(sig.pseudorange),
@@ -105,19 +99,12 @@ def load_epoch_data(
     return satpos, obs, spp_pos
 
 
-def list_epochs_between(
-    db_path: Path, start: dt.datetime, end: dt.datetime
-) -> list[dt.datetime]:
+def list_epochs_between(db_path: Path, start: dt.datetime, end: dt.datetime) -> list[dt.datetime]:
     """List epoch datetimes within [start, end]."""
     db = GnssDatabase(db_path)
     session = db.Session()
     try:
-        rows = (
-            session.query(Epoch.datetime)
-            .filter(Epoch.datetime >= start, Epoch.datetime <= end)
-            .order_by(Epoch.datetime)
-            .all()
-        )
+        rows = session.query(Epoch.datetime).filter(Epoch.datetime >= start, Epoch.datetime <= end).order_by(Epoch.datetime).all()
         return [r[0] for r in rows]
     finally:
         session.close()
@@ -211,16 +198,11 @@ def estimate_position_with_fixed_ambiguity(
             dd_rho = dd_matrix @ np.array(ranges, dtype=float)
 
             los = np.array(
-                [
-                    (satpos_rover[s] - x) / np.linalg.norm(satpos_rover[s] - x)
-                    for s in sat_order
-                ],
+                [(satpos_rover[s] - x) / np.linalg.norm(satpos_rover[s] - x) for s in sat_order],
                 dtype=float,
             )
 
-            dy[row : row + num_dd] = dd_obs_by_band[b] - (
-                dd_rho / wl + dd_ambiguity_by_band[b]
-            )
+            dy[row : row + num_dd] = dd_obs_by_band[b] - (dd_rho / wl + dd_ambiguity_by_band[b])
             h[row : row + num_dd, :] = -d_left @ los / wl
 
         htw = h.T @ w
@@ -236,9 +218,7 @@ def estimate_position_with_fixed_ambiguity(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Relative positioning with fixed DD integer ambiguities"
-    )
+    parser = argparse.ArgumentParser(description="Relative positioning with fixed DD integer ambiguities")
     parser.add_argument("--base-db", required=True, help="Base station SQLite DB")
     parser.add_argument("--rover-db", required=True, help="Rover station SQLite DB")
     parser.add_argument(
@@ -246,9 +226,7 @@ def main() -> int:
         required=True,
         help="JSON file containing DD ambiguity information",
     )
-    parser.add_argument(
-        "--start", required=True, type=parse_datetime, help="Start time"
-    )
+    parser.add_argument("--start", required=True, type=parse_datetime, help="Start time")
     parser.add_argument("--end", required=True, type=parse_datetime, help="End time")
     parser.add_argument(
         "--out",
@@ -297,9 +275,7 @@ def main() -> int:
 
     bands = list(amb_info["bands"])
     satellite_blocks = tuple([list(block) for block in amb_info["satellite_blocks"]])
-    dd_ambiguity_by_band = {
-        b: np.array(amb_info["dd_phase_biases_int"][b], dtype=float) for b in bands
-    }
+    dd_ambiguity_by_band = {b: np.array(amb_info["dd_phase_biases_int"][b], dtype=float) for b in bands}
     wavelengths = {b: float(amb_info["wavelengths"][b]) for b in bands}
     sigma_phi = {b: float(amb_info.get("sigma_phi", {}).get(b, 0.01)) for b in bands}
 
@@ -307,22 +283,14 @@ def main() -> int:
     if dd_matrix.shape[0] == 0:
         raise ValueError("No valid DD rows. Check satellite_blocks in ambiguity JSON.")
 
-    base_pos_list = amb_info.get(
-        "base_station_position_ecef", amb_info.get("base_position")
-    )
+    base_pos_list = amb_info.get("base_station_position_ecef", amb_info.get("base_position"))
     if base_pos_list is None:
-        raise ValueError(
-            "Ambiguity JSON must contain base_station_position_ecef (or base_position)."
-        )
+        raise ValueError("Ambiguity JSON must contain base_station_position_ecef (or base_position).")
     base_pos = np.array(base_pos_list, dtype=float)
     if base_pos.shape != (3,):
-        raise ValueError(
-            "Base station position in JSON must be 3-element ECEF [x, y, z]."
-        )
+        raise ValueError("Base station position in JSON must be 3-element ECEF [x, y, z].")
 
-    ref_rover_pos = np.array(
-        amb_info.get("reference_rover_position", [0.0, 0.0, 0.0]), dtype=float
-    )
+    ref_rover_pos = np.array(amb_info.get("reference_rover_position", [0.0, 0.0, 0.0]), dtype=float)
 
     base_epochs = set(list_epochs_between(base_db, args.start, args.end))
     rover_epochs = set(list_epochs_between(rover_db, args.start, args.end))
@@ -351,14 +319,10 @@ def main() -> int:
     }
 
     for epoch_dt in common_epochs:
-        satpos_rover, obs_rover, spp_rover = load_epoch_data(
-            rover_db, epoch_dt, sat_order, bands
-        )
+        satpos_rover, obs_rover, spp_rover = load_epoch_data(rover_db, epoch_dt, sat_order, bands)
         satpos_base, obs_base, _ = load_epoch_data(base_db, epoch_dt, sat_order, bands)
 
-        valid, reason = check_epoch_has_all_required(
-            satpos_rover, satpos_base, obs_rover, obs_base, sat_order, bands
-        )
+        valid, reason = check_epoch_has_all_required(satpos_rover, satpos_base, obs_rover, obs_base, sat_order, bands)
         if not valid:
             print(f"[{epoch_dt}] skipped: {reason}")
             continue
@@ -387,10 +351,7 @@ def main() -> int:
         baseline = float(np.linalg.norm(est_pos - base_pos))
         rover_llh = ecef_to_llh(est_pos)
         num_sats = len(sat_order)
-        print(
-            f"[{epoch_dt}] pos={est_pos} baseline={baseline:.3f} m "
-            f"iters={iters} residual_norm={res_norm:.6e}"
-        )
+        print(f"[{epoch_dt}] pos={est_pos} baseline={baseline:.3f} m iters={iters} residual_norm={res_norm:.6e}")
 
         epoch_result = RelativePositionEpochResult(
             datetime=epoch_dt,

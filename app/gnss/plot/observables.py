@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import cast, Any
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 
@@ -105,30 +105,14 @@ def plot_satellite_observations(
                             "values": [],
                         }
 
-                    satellite_data[sat_id]["pseudorange"][band_name]["times"].append(
-                        epoch.datetime
-                    )
-                    satellite_data[sat_id]["pseudorange"][band_name]["values"].append(
-                        signal_obs.pseudorange
-                    )
-                    satellite_data[sat_id]["carrier_phase"][band_name]["times"].append(
-                        epoch.datetime
-                    )
-                    satellite_data[sat_id]["carrier_phase"][band_name]["values"].append(
-                        signal_obs.carrier_phase
-                    )
-                    satellite_data[sat_id]["doppler"][band_name]["times"].append(
-                        epoch.datetime
-                    )
-                    satellite_data[sat_id]["doppler"][band_name]["values"].append(
-                        signal_obs.doppler_
-                    )
-                    satellite_data[sat_id]["snr"][band_name]["times"].append(
-                        epoch.datetime
-                    )
-                    satellite_data[sat_id]["snr"][band_name]["values"].append(
-                        signal_obs.snr
-                    )
+                    satellite_data[sat_id]["pseudorange"][band_name]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["pseudorange"][band_name]["values"].append(signal_obs.pseudorange)
+                    satellite_data[sat_id]["carrier_phase"][band_name]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["carrier_phase"][band_name]["values"].append(signal_obs.carrier_phase)
+                    satellite_data[sat_id]["doppler"][band_name]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["doppler"][band_name]["values"].append(signal_obs.doppler_)
+                    satellite_data[sat_id]["snr"][band_name]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["snr"][band_name]["values"].append(signal_obs.snr)
 
                 # Add ambiguity data for all available combinations
                 for comb_name, amb_obs in sat_obs.ambiguities.items():
@@ -139,30 +123,14 @@ def plot_satellite_observations(
                             "geofree": {"times": [], "values": []},
                             "multipath": {"times": [], "values": []},
                         }
-                    satellite_data[sat_id]["ambiguities"][comb_name]["widelane"][
-                        "times"
-                    ].append(epoch.datetime)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["widelane"][
-                        "values"
-                    ].append(amb_obs.widelane)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"][
-                        "times"
-                    ].append(epoch.datetime)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"][
-                        "values"
-                    ].append(amb_obs.ionofree)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["geofree"][
-                        "times"
-                    ].append(epoch.datetime)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["geofree"][
-                        "values"
-                    ].append(amb_obs.geofree)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["multipath"][
-                        "times"
-                    ].append(epoch.datetime)
-                    satellite_data[sat_id]["ambiguities"][comb_name]["multipath"][
-                        "values"
-                    ].append(amb_obs.multipath)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["widelane"]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["widelane"]["values"].append(amb_obs.widelane)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["ionofree"]["values"].append(amb_obs.ionofree)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["geofree"]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["geofree"]["values"].append(amb_obs.geofree)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["multipath"]["times"].append(epoch.datetime)
+                    satellite_data[sat_id]["ambiguities"][comb_name]["multipath"]["values"].append(amb_obs.multipath)
 
     # Create plots for each satellite
     for sat_id, data in satellite_data.items():
@@ -299,9 +267,7 @@ def plot_satellite_observations(
         # Plot ambiguity data for each combination
         if has_ambiguity:
             colors = ["purple", "orange", "green", "red", "blue", "brown"]
-            for comb_idx, (comb_name, comb_data) in enumerate(
-                data["ambiguities"].items()
-            ):
+            for comb_idx, (comb_name, comb_data) in enumerate(data["ambiguities"].items()):
                 color_wl = colors[comb_idx * 2 % len(colors)]
                 color_if = colors[(comb_idx * 2 + 1) % len(colors)]
 
@@ -324,10 +290,7 @@ def plot_satellite_observations(
                             axes[plot_idx].set_ylim(mean_val - 3, mean_val + 3)
                         if show_ambiguity_statistics:
                             mean_wl = sum(wl_values) / len(wl_values)
-                            std_wl = (
-                                sum((x - mean_wl) ** 2 for x in wl_values)
-                                / len(wl_values)
-                            ) ** 0.5
+                            std_wl = (sum((x - mean_wl) ** 2 for x in wl_values) / len(wl_values)) ** 0.5
                             axes[plot_idx].set_title(
                                 f"{comb_name} Widelane Ambiguity (mean={mean_wl:.2f}, std={std_wl:.2f}, max-min={max(wl_values) - min(wl_values):.2f} cycles)"
                             )
@@ -355,10 +318,7 @@ def plot_satellite_observations(
                             axes[plot_idx].set_ylim(mean_val - 3, mean_val + 3)
                         if show_ambiguity_statistics:
                             mean_if = sum(if_values) / len(if_values)
-                            std_if = (
-                                sum((x - mean_if) ** 2 for x in if_values)
-                                / len(if_values)
-                            ) ** 0.5
+                            std_if = (sum((x - mean_if) ** 2 for x in if_values) / len(if_values)) ** 0.5
                             axes[plot_idx].set_title(
                                 f"{comb_name} Ionofree Ambiguity (mean={mean_if:.2f}, std={std_if:.2f}, max-min={max(if_values) - min(if_values):.2f} cycles)"
                             )
@@ -384,10 +344,7 @@ def plot_satellite_observations(
                             axes[plot_idx].set_ylim(mean_val - 2, mean_val + 2)
                         if show_ambiguity_statistics:
                             mean_gf = sum(gf_values) / len(gf_values)
-                            std_gf = (
-                                sum((x - mean_gf) ** 2 for x in gf_values)
-                                / len(gf_values)
-                            ) ** 0.5
+                            std_gf = (sum((x - mean_gf) ** 2 for x in gf_values) / len(gf_values)) ** 0.5
                             axes[plot_idx].set_title(
                                 f"{comb_name} Geofree Ambiguity (mean={mean_gf:.2f}, std={std_gf:.2f}, max-min={max(gf_values) - min(gf_values):.2f} cycles)"
                             )
@@ -414,10 +371,7 @@ def plot_satellite_observations(
                             axes[plot_idx].set_ylim(mean_val - 1, mean_val + 1)
                         if show_ambiguity_statistics:
                             mean_mp = sum(mp_values) / len(mp_values)
-                            std_mp = (
-                                sum((x - mean_mp) ** 2 for x in mp_values)
-                                / len(mp_values)
-                            ) ** 0.5
+                            std_mp = (sum((x - mean_mp) ** 2 for x in mp_values) / len(mp_values)) ** 0.5
                             axes[plot_idx].set_title(
                                 f"{comb_name} Multipath (mean={mean_mp:.2f}, std={std_mp:.2f}, max-min={max(mp_values) - min(mp_values):.2f})"
                             )

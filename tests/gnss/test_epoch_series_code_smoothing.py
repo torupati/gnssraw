@@ -4,13 +4,13 @@ import csv
 from datetime import datetime
 from io import StringIO
 
+import matplotlib.pyplot as plt
+
 from app.gnss.constants import wlen_L1
 from app.gnss.epoch_series import (
     smooth_code_carrier,
     MeasurementForCarrierSmoothing,
 )
-
-import matplotlib.pyplot as plt
 
 
 sample_csv_string = """
