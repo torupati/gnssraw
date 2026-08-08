@@ -192,7 +192,7 @@ def main() -> int:
         epoch2 = parse_datetime(cfg["epochs"]["end_time"])
         bands = list(cfg["bands"])
         satellite_blocks = normalize_satellite_blocks(cfg["satellite_blocks"])
-    except Exception as e:
+    except (KeyError, ValueError) as e:
         raise ValueError(f"Invalid epoch format in config JSON: {e}")
 
     satellite_order = [sat for block in satellite_blocks for sat in block]

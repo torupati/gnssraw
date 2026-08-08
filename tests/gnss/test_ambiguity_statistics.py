@@ -1,9 +1,9 @@
 """Tests for ambiguity statistics computation."""
 
+import csv
 from datetime import datetime
 from pathlib import Path
 import tempfile
-import csv
 
 from app.gnss.satellite_signals import (
     EpochObservations,

@@ -1,10 +1,13 @@
 import argparse
 import json
-from pathlib import Path
 from logging import getLogger, basicConfig, INFO
+from pathlib import Path
+import sys
 
 
 from app.gnss.epoch_series import smoothing_code_range_of_receiver
+from app.gnss.plot.observables import plot_satellite_observations
+from app.gnss.rtcm3 import read_rtcm3_file
 from app.gnss.satellite_signals import (
     EpochObservations,
     parse_rinex_observation_file,
@@ -12,8 +15,6 @@ from app.gnss.satellite_signals import (
     save_ambiguity_statistics_to_csv,
     calculate_combined_observations,
 )
-from app.gnss.rtcm3 import read_rtcm3_file
-from app.gnss.plot.observables import plot_satellite_observations
 
 logger = getLogger(__name__)
 
@@ -245,4 +246,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

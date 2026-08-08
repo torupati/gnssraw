@@ -209,8 +209,8 @@ def _earth_surface() -> go.Surface:
         colorscale=[[0, "#0d3b6e"], [1, "#1565c0"]],
         showscale=False,
         opacity=0.92,
-        lighting=dict(ambient=0.5, diffuse=0.9, specular=0.15, roughness=0.7),
-        lightposition=dict(x=100_000, y=80_000, z=100_000),
+        lighting={"ambient": 0.5, "diffuse": 0.9, "specular": 0.15, "roughness": 0.7},
+        lightposition={"x": 100_000, "y": 80_000, "z": 100_000},
         hoverinfo="skip",
         showlegend=False,
         name="Earth",
@@ -225,7 +225,7 @@ def _equator_ring() -> go.Scatter3d:
         y=r * np.sin(theta),
         z=np.zeros(360),
         mode="lines",
-        line=dict(color="rgba(255,255,255,0.25)", width=1),
+        line={"color": "rgba(255,255,255,0.25)", "width": 1},
         hoverinfo="skip",
         showlegend=False,
         name="Equator",
@@ -239,7 +239,7 @@ def _pole_axis() -> go.Scatter3d:
         y=[0, 0],
         z=[-r, r],
         mode="lines",
-        line=dict(color="rgba(255,255,255,0.2)", width=1, dash="dash"),
+        line={"color": "rgba(255,255,255,0.2)", "width": 1, "dash": "dash"},
         hoverinfo="skip",
         showlegend=False,
         name="Pole axis",
@@ -249,28 +249,40 @@ def _pole_axis() -> go.Scatter3d:
 def _build_layout(title: str, epoch_utc: datetime) -> go.Layout:
     epoch_str = epoch_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     return go.Layout(
-        title=dict(
-            text=f"{title}<br><sub>{epoch_str}</sub>",
-            x=0.5,
-            font=dict(size=15, color="white"),
-        ),
-        scene=dict(
-            xaxis=dict(title="X [km]", gridcolor="#2a2a2a", zerolinecolor="#333"),
-            yaxis=dict(title="Y [km]", gridcolor="#2a2a2a", zerolinecolor="#333"),
-            zaxis=dict(title="Z [km]", gridcolor="#2a2a2a", zerolinecolor="#333"),
-            bgcolor="#080808",
-            aspectmode="data",
-            camera=dict(eye=dict(x=1.6, y=1.2, z=0.8)),
-        ),
+        title={
+            "text": f"{title}<br><sub>{epoch_str}</sub>",
+            "x": 0.5,
+            "font": {"size": 15, "color": "white"},
+        },
+        scene={
+            "xaxis": {
+                "title": "X [km]",
+                "gridcolor": "#2a2a2a",
+                "zerolinecolor": "#333",
+            },
+            "yaxis": {
+                "title": "Y [km]",
+                "gridcolor": "#2a2a2a",
+                "zerolinecolor": "#333",
+            },
+            "zaxis": {
+                "title": "Z [km]",
+                "gridcolor": "#2a2a2a",
+                "zerolinecolor": "#333",
+            },
+            "bgcolor": "#080808",
+            "aspectmode": "data",
+            "camera": {"eye": {"x": 1.6, "y": 1.2, "z": 0.8}},
+        },
         paper_bgcolor="#111111",
-        font=dict(color="#dddddd"),
-        legend=dict(
-            bgcolor="rgba(20,20,20,0.85)",
-            bordercolor="#444",
-            borderwidth=1,
-            font=dict(size=9),
-        ),
-        margin=dict(l=0, r=0, t=70, b=0),
+        font={"color": "#dddddd"},
+        legend={
+            "bgcolor": "rgba(20,20,20,0.85)",
+            "bordercolor": "#444",
+            "borderwidth": 1,
+            "font": {"size": 9},
+        },
+        margin={"l": 0, "r": 0, "t": 70, "b": 0},
     )
 
 
@@ -297,7 +309,7 @@ def plot_3d_orbits(
 
         try:
             x, y, z = compute_gcrs_positions(sat, ts, t_epoch, duration_minutes)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             print(f"  Warning: {sat.name} failed: {exc}")
             continue
 
@@ -307,7 +319,7 @@ def plot_3d_orbits(
                 y=y,
                 z=z,
                 mode="lines",
-                line=dict(color=color, width=1.5),
+                line={"color": color, "width": 1.5},
                 name=sat.name,
                 hoverinfo="name",
             )
@@ -322,12 +334,14 @@ def plot_3d_orbits(
                     y=[pos[1]],
                     z=[pos[2]],
                     mode="markers+text",
-                    marker=dict(
-                        size=5, color=color, line=dict(color="white", width=0.5)
-                    ),
+                    marker={
+                        "size": 5,
+                        "color": color,
+                        "line": {"color": "white", "width": 0.5},
+                    },
                     text=[sat.name],
                     textposition="top center",
-                    textfont=dict(size=7, color=color),
+                    textfont={"size": 7, "color": color},
                     hovertext=(
                         f"{sat.name}<br>"
                         f"x={pos[0]:.0f} km  y={pos[1]:.0f} km  z={pos[2]:.0f} km"
@@ -336,7 +350,7 @@ def plot_3d_orbits(
                     showlegend=False,
                 )
             )
-        except Exception:
+        except (ValueError, RuntimeError):
             pass
 
     fig = go.Figure(data=traces, layout=_build_layout(title, epoch_utc))
@@ -345,8 +359,7 @@ def plot_3d_orbits(
 
 def _save_or_show(fig: go.Figure, output_path: str | None) -> None:
     if output_path is None:
-        fig.show()
-        return
+        output_path = "plot_orbit3d.html"
     if output_path.endswith(".html"):
         fig.write_html(output_path, include_plotlyjs="cdn")
         print(f"Saved: {output_path}")
@@ -354,7 +367,7 @@ def _save_or_show(fig: go.Figure, output_path: str | None) -> None:
         try:
             fig.write_image(output_path)
             print(f"Saved: {output_path}")
-        except Exception as exc:
+        except (ValueError, OSError) as exc:
             print(f"Cannot save image: {exc}")
             print("Tip: install kaleido with `uv add kaleido` for PNG/SVG output.")
             html_path = output_path.rsplit(".", 1)[0] + ".html"
@@ -416,7 +429,7 @@ def main() -> None:
         "--output",
         metavar="FILE",
         default=None,
-        help="Save to file (.html interactive or .png static). Default: open in browser.",
+        help="Save to file (.html interactive or .png static). Default: plot_orbit3d.html",
     )
     args = parser.parse_args()
 

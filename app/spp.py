@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+import json
 from logging import getLogger, basicConfig, INFO
 from pathlib import Path
 
@@ -13,7 +13,7 @@ import numpy as np
 
 from app.gnss.constants import CLIGHT
 from app.gnss.coordinates import ecef_to_enu_matrix, ecef_to_llh
-from app.gnss.troposphere import tropospheric_delay
+from app.gnss.database import GnssDatabase
 from app.gnss.ephemeris import (
     read_rinex_nav,
     compute_satellite_state,
@@ -21,13 +21,13 @@ from app.gnss.ephemeris import (
     datetime_to_gps_week_seconds,
     OMEGA_E,
 )
+from app.gnss.ionosphere import KlobucharManager, KlobucharModel
 from app.gnss.satellite_signals import (
     EpochObservations,
     SatelliteObservation,
     parse_rinex_observation_file,
 )
-from app.gnss.ionosphere import KlobucharManager, KlobucharModel
-from app.gnss.database import GnssDatabase
+from app.gnss.troposphere import tropospheric_delay
 
 logger = getLogger(__name__)
 
@@ -119,7 +119,7 @@ def collect_measurements(
 
         try:
             sat_pos, dtsv = compute_satellite_state(nav, epoch.datetime, pr)
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             logger.warning("Failed to compute satellite state for %s: %s", sat_id, e)
             continue
         if not np.all(np.isfinite(sat_pos)) or not np.isfinite(dtsv):
@@ -388,7 +388,7 @@ def main() -> int:
         model = KlobucharModel(ion_params["ion_alpha"], ion_params["ion_beta"])
 
         # Determine valid time (using the first epoch's time or a placeholder)
-        time_of_data = epochs[0].datetime if epochs else datetime.utcnow()
+        time_of_data = epochs[0].datetime if epochs else datetime.now(tz=timezone.utc)
         ionosphere_manager.add_model(time_of_data, model)
     logger.info(
         "Using ionosphere model: %s",

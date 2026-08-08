@@ -1,8 +1,9 @@
 import argparse
-import json
-from pathlib import Path
-from logging import getLogger, basicConfig, INFO
 from collections import defaultdict
+import json
+from logging import getLogger, basicConfig, INFO
+from pathlib import Path
+import sys
 
 import matplotlib.pyplot as plt
 
@@ -798,4 +799,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
