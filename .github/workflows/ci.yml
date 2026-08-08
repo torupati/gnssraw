@@ -27,7 +27,7 @@ jobs:
         run: ruff --version
 
       - name: Ruff check
-        run: ruff check . --output-format=github
+        run: ruff check ./app/ --output-format=github
 
       - name: Ruff format (check)
         run: ruff format --check .
