@@ -55,6 +55,4 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.ruff]
-# Exclude misc utilities and tests from linting
-[tool.ruff]
 exclude = ["misc", "tests"]
