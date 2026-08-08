@@ -11,9 +11,7 @@ from app.gnss.coordinates import ecef_to_enu_matrix
 logger = getLogger(__name__)
 
 
-def tropospheric_delay(
-    receiver_llh: np.ndarray, sat_pos: np.ndarray, recv_pos: np.ndarray
-) -> float:
+def tropospheric_delay(receiver_llh: np.ndarray, sat_pos: np.ndarray, recv_pos: np.ndarray) -> float:
     """
     Calculate tropospheric delay correction for the signal path.
 

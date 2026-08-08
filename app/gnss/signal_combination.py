@@ -25,9 +25,7 @@ def _find_closest_epoch(
         return ref_epochs[-1]
     before = ref_epochs[idx - 1]
     after = ref_epochs[idx]
-    if abs((target_time - before.datetime).total_seconds()) <= abs(
-        (after.datetime - target_time).total_seconds()
-    ):
+    if abs((target_time - before.datetime).total_seconds()) <= abs((after.datetime - target_time).total_seconds()):
         return before
     return after
 
@@ -111,12 +109,8 @@ def _compute_double_difference_for_pair(
             "ionofree": None,
         }
 
-    widelane_dd = (obs_amb1.widelane - obs_amb2.widelane) - (
-        ref_amb1.widelane - ref_amb2.widelane
-    )
-    ionofree_dd = (obs_amb1.ionofree - obs_amb2.ionofree) - (
-        ref_amb1.ionofree - ref_amb2.ionofree
-    )
+    widelane_dd = (obs_amb1.widelane - obs_amb2.widelane) - (ref_amb1.widelane - ref_amb2.widelane)
+    ionofree_dd = (obs_amb1.ionofree - obs_amb2.ionofree) - (ref_amb1.ionofree - ref_amb2.ionofree)
 
     return {
         "sat1": sat1,
@@ -165,12 +159,8 @@ def update_combined_observation(
                 )
                 continue
 
-            obs_keys = set(obs_sat1.ambiguities.keys()) & set(
-                obs_sat2.ambiguities.keys()
-            )
-            ref_keys = set(ref_sat1.ambiguities.keys()) & set(
-                ref_sat2.ambiguities.keys()
-            )
+            obs_keys = set(obs_sat1.ambiguities.keys()) & set(obs_sat2.ambiguities.keys())
+            ref_keys = set(ref_sat1.ambiguities.keys()) & set(ref_sat2.ambiguities.keys())
             common_keys = sorted(obs_keys & ref_keys)
 
             if combinations is not None:
@@ -186,10 +176,6 @@ def update_combined_observation(
                 continue
 
             for comb in common_keys:
-                combined.append(
-                    _compute_double_difference_for_pair(
-                        pair.observation, pair.ref_observation, sat1, sat2, comb
-                    )
-                )
+                combined.append(_compute_double_difference_for_pair(pair.observation, pair.ref_observation, sat1, sat2, comb))
 
         pair.combined_observations = combined
