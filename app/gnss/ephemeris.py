@@ -5,7 +5,6 @@ Provides GPS ephemeris data structures and satellite position computation.
 
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -129,7 +128,7 @@ class GPSEphemeris:
             "iode": self.iode,
         }
 
-    def to_json(self, indent: Optional[int] = None) -> str:
+    def to_json(self, indent: int | None = None) -> str:
         """
         Convert ephemeris data to JSON string
 
@@ -206,7 +205,7 @@ class GPSEphemeris:
 
 def read_rinex_nav(
     nav_file: str,
-) -> tuple[Dict[str, List[GPSEphemeris]], Dict[str, list[float]]]:
+) -> tuple[dict[str, list[GPSEphemeris]], dict[str, list[float]]]:
     """
     Read RINEX navigation file
 
@@ -216,10 +215,10 @@ def read_rinex_nav(
     Returns:
         Tuple of (ephemerides dict, ionosphere parameters dict).
     """
-    ephemerides: Dict[str, List[GPSEphemeris]] = {}
-    ion_params: Dict[str, list[float]] = {}
+    ephemerides: dict[str, list[GPSEphemeris]] = {}
+    ion_params: dict[str, list[float]] = {}
 
-    with open(nav_file, "r", encoding="utf-8") as f:
+    with open(nav_file, encoding="utf-8") as f:
         lines = f.readlines()
 
     # Read header
@@ -421,9 +420,7 @@ def broadcast_ecef_and_clock(
     # Compute satellite clock correction at transmission time
     _, toc_sow = datetime_to_gps_week_seconds(nav.toc)
     dt = _wrap_time_diff(sow - toc_sow)
-    dtsv = (
-        nav.af0 + nav.af1 * dt + nav.af2 * dt**2 + F_REL * nav.e * nav.sqrtA * np.sin(E)
-    )
+    dtsv = nav.af0 + nav.af1 * dt + nav.af2 * dt**2 + F_REL * nav.e * nav.sqrtA * np.sin(E)
 
     return np.array([x, y, z]), dtsv
 
@@ -444,8 +441,6 @@ def compute_satellite_state(
     Returns:
         Tuple of (position [x,y,z] in ECEF meters, clock bias in seconds)
     """
-    _, sow = datetime_to_gps_week_seconds(
-        recv_dt - timedelta(seconds=pseudorange_m / CLIGHT)
-    )
+    _, sow = datetime_to_gps_week_seconds(recv_dt - timedelta(seconds=pseudorange_m / CLIGHT))
     sat_pos, dtsv = broadcast_ecef_and_clock(nav, sow)
     return sat_pos, dtsv

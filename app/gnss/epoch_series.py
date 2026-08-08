@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+
 from app.gnss.constants import (
     wlen_L1,
 )
@@ -116,9 +117,7 @@ def smoothing_code_range_of_receiver(
 
     sat_band_series: dict[
         str,
-        dict[
-            str, list[tuple[MeasurementForCarrierSmoothing, SatelliteSignalObservation]]
-        ],
+        dict[str, list[tuple[MeasurementForCarrierSmoothing, SatelliteSignalObservation]]],
     ] = {}
     for epoch_obs in epoch_observations:
         for sat_id, sat_obs in epoch_obs.iter_satellites():
@@ -127,9 +126,7 @@ def smoothing_code_range_of_receiver(
             for band_name, signal_obs in sat_obs.signals.items():
                 if band_name not in band_wavelengths:
                     continue
-                series = sat_band_series.setdefault(sat_id, {}).setdefault(
-                    band_name, []
-                )
+                series = sat_band_series.setdefault(sat_id, {}).setdefault(band_name, [])
                 series.append(
                     (
                         MeasurementForCarrierSmoothing(

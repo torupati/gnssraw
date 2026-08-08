@@ -56,3 +56,13 @@ no_implicit_optional = true
 
 [tool.ruff]
 exclude = ["misc", "tests"]
+line-length = 160
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "RUF",  # ruff-specific rules (e.g. RUF022 unsorted __all__)
+    "UP",   # pyupgrade (e.g. UP035 deprecated typing, UP045 Optional->X|None)
+]

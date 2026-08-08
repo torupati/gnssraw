@@ -1,19 +1,18 @@
 import argparse
 import json
-from logging import getLogger, basicConfig, INFO
-from pathlib import Path
 import sys
-
+from logging import INFO, basicConfig, getLogger
+from pathlib import Path
 
 from app.gnss.epoch_series import smoothing_code_range_of_receiver
 from app.gnss.plot.observables import plot_satellite_observations
 from app.gnss.rtcm3 import read_rtcm3_file
 from app.gnss.satellite_signals import (
     EpochObservations,
-    parse_rinex_observation_file,
-    save_gnss_observations_to_json,
-    save_ambiguity_statistics_to_csv,
     calculate_combined_observations,
+    parse_rinex_observation_file,
+    save_ambiguity_statistics_to_csv,
+    save_gnss_observations_to_json,
 )
 
 logger = getLogger(__name__)
@@ -35,18 +34,14 @@ def parse_plot_modes(mode_str):
         except ValueError:
             raise argparse.ArgumentTypeError(f"Invalid plot mode: {part.strip()}")
         if mode not in [1, 2, 3, 4, 5, 6]:
-            raise argparse.ArgumentTypeError(
-                f"Invalid plot mode: {mode}. Must be 1, 2, 3, 4, 5, or 6"
-            )
+            raise argparse.ArgumentTypeError(f"Invalid plot mode: {mode}. Must be 1, 2, 3, 4, 5, or 6")
         modes.append(mode)
     # Return single int if only one mode, otherwise return list
     return modes[0] if len(modes) == 1 else modes
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Process RINEX observation files and generate plots"
-    )
+    parser = argparse.ArgumentParser(description="Process RINEX observation files and generate plots")
     parser.add_argument("input_file", type=str, help="Path to RINEX or RTCM3 file")
     parser.add_argument(
         "--input-type",
@@ -102,18 +97,12 @@ def main():
         "--signal-code-map",
         type=str,
         default=str(Path(__file__).parent / ".signal_code_map.json"),
-        help=(
-            "Path to JSON file that defines signal_code_map "
-            "(required for RINEX3, default: .signal_code_map.json)"
-        ),
+        help=("Path to JSON file that defines signal_code_map (required for RINEX3, default: .signal_code_map.json)"),
     )
     parser.add_argument(
         "--plot-goodstyle",
         action="store_true",
-        help=(
-            "Apply a light-and-minimal style to plots "
-            "(white/light-grey background, subtle grid, hidden top/right spines)"
-        ),
+        help=("Apply a light-and-minimal style to plots (white/light-grey background, subtle grid, hidden top/right spines)"),
     )
     parser.add_argument(
         "--carrier-smoothing",
@@ -124,10 +113,7 @@ def main():
         "--carrier-smoothing-slip-threshold",
         type=float,
         default=10.0,
-        help=(
-            "Cycle-slip detection threshold in meters for carrier smoothing "
-            "(default: 10.0)"
-        ),
+        help=("Cycle-slip detection threshold in meters for carrier smoothing (default: 10.0)"),
     )
     parser.add_argument(
         "--carrier-smoothing-code-noise",
@@ -169,19 +155,13 @@ def main():
             with signal_code_map_path.open("r", encoding="utf-8") as f:
                 signal_code_map = json.load(f)
         except json.JSONDecodeError as exc:
-            logger.error(
-                f"Invalid JSON in signal code map file: {signal_code_map_path} ({exc})"
-            )
+            logger.error(f"Invalid JSON in signal code map file: {signal_code_map_path} ({exc})")
             return 1
 
         # Parse RINEX file
         logger.info(f"Parsing RINEX3 file: {input_path}")
-        epochs: list[EpochObservations] = parse_rinex_observation_file(
-            str(input_path), signal_code_map
-        )
-        logger.info(
-            f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}"
-        )
+        epochs: list[EpochObservations] = parse_rinex_observation_file(str(input_path), signal_code_map)
+        logger.info(f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}")
     elif args.input_type == "RTCM3":
         # Validate gpsweek argument
         if args.gpsweek is None:
@@ -191,9 +171,7 @@ def main():
         # Parse RTCM3 file
         logger.info(f"Parsing RTCM3 file: {input_path} (GPS week: {args.gpsweek})")
         epochs: list[EpochObservations] = read_rtcm3_file(input_path, args.gpsweek)
-        logger.info(
-            f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}"
-        )
+        logger.info(f"... parsed {len(epochs)} epochs. {epochs[0].datetime if epochs else 'N/A'} to {epochs[-1].datetime if epochs else 'N/A'}")
     else:
         logger.error(f"Unknown input type: {args.input_type}")
         return 1
@@ -229,9 +207,7 @@ def main():
     else:
         logger.info("Generating plots...")
         # Handle both single mode and multiple modes
-        plot_modes = (
-            args.plot_mode if isinstance(args.plot_mode, list) else [args.plot_mode]
-        )
+        plot_modes = args.plot_mode if isinstance(args.plot_mode, list) else [args.plot_mode]
         for mode in plot_modes:
             plot_satellite_observations(
                 epochs,

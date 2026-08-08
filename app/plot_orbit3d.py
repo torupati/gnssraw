@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 import plotly.graph_objects as go
-from skyfield.api import load, EarthSatellite
+from skyfield.api import EarthSatellite, load
 from skyfield.timelib import Time
 
 # --------------------------------------------------------------------------- #
@@ -36,12 +36,8 @@ from skyfield.timelib import Time
 _RE_KM = 6371.0  # mean Earth radius
 
 _CELESTRAK_BASE = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=TLE"
-_CELESTRAK_NAME_URL = (
-    "https://celestrak.org/NORAD/elements/gp.php?NAME={name}&FORMAT=TLE"
-)
-_CELESTRAK_CATNR_URL = (
-    "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
-)
+_CELESTRAK_NAME_URL = "https://celestrak.org/NORAD/elements/gp.php?NAME={name}&FORMAT=TLE"
+_CELESTRAK_CATNR_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
 
 _ConstellationDef = tuple[str, int, list[str] | None]
 
@@ -113,17 +109,13 @@ def parse_epoch(s: str) -> datetime:
             return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-    raise ValueError(
-        f"Cannot parse epoch '{s}'. Expected ISO 8601, e.g. 2027-01-15T06:30:00"
-    )
+    raise ValueError(f"Cannot parse epoch '{s}'. Expected ISO 8601, e.g. 2027-01-15T06:30:00")
 
 
 def resolve_constellation(name: str) -> str:
     key = name.strip().lower()
     if key not in _CONSTELLATION_LOOKUP:
-        raise ValueError(
-            f"Unknown constellation '{name}'. Valid: {', '.join(CONSTELLATIONS)}"
-        )
+        raise ValueError(f"Unknown constellation '{name}'. Valid: {', '.join(CONSTELLATIONS)}")
     return _CONSTELLATION_LOOKUP[key]
 
 
@@ -150,9 +142,7 @@ def fetch_satellite_by_spec(spec: str, ts) -> EarthSatellite:
     try:
         sats = load.tle_file(url, filename=cache)
     except OSError as exc:
-        raise ValueError(
-            f"Satellite '{spec}' not found (HTTP 404). It may have de-orbited."
-        ) from exc
+        raise ValueError(f"Satellite '{spec}' not found (HTTP 404). It may have de-orbited.") from exc
 
     if not sats:
         raise ValueError(f"No satellite found for '{spec}'.")
@@ -342,10 +332,7 @@ def plot_3d_orbits(
                     text=[sat.name],
                     textposition="top center",
                     textfont={"size": 7, "color": color},
-                    hovertext=(
-                        f"{sat.name}<br>"
-                        f"x={pos[0]:.0f} km  y={pos[1]:.0f} km  z={pos[2]:.0f} km"
-                    ),
+                    hovertext=(f"{sat.name}<br>x={pos[0]:.0f} km  y={pos[1]:.0f} km  z={pos[2]:.0f} km"),
                     hoverinfo="text",
                     showlegend=False,
                 )
@@ -458,9 +445,7 @@ def main() -> None:
             parser.error(str(exc))
         _, duration, _ = CONSTELLATIONS[constellation]
         sats, ts = fetch_satellites(constellation)
-        plot_3d_orbits(
-            sats, ts, duration, epoch_utc, f"{constellation} Constellation", args.output
-        )
+        plot_3d_orbits(sats, ts, duration, epoch_utc, f"{constellation} Constellation", args.output)
 
 
 if __name__ == "__main__":

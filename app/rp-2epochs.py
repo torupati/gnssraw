@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 
 from app.gnss.constants import CLIGHT, wlen_L1, wlen_L2, wlen_L5
-from app.gnss.database import GnssDatabase, Epoch
+from app.gnss.database import Epoch, GnssDatabase
 
 freq_L1 = CLIGHT / wlen_L1
 freq_L2 = CLIGHT / wlen_L2
@@ -28,9 +28,7 @@ def parse_datetime(value: str) -> dt.datetime:
     try:
         return dt.datetime.fromisoformat(value)
     except ValueError as exc:
-        raise ValueError(
-            f"Invalid datetime '{value}'. Use YYYY-MM-DD HH:MM:SS"
-        ) from exc
+        raise ValueError(f"Invalid datetime '{value}'. Use YYYY-MM-DD HH:MM:SS") from exc
 
 
 def normalize_satellite_blocks(raw_blocks: Any) -> tuple[list[str], ...]:
@@ -49,9 +47,7 @@ def normalize_satellite_blocks(raw_blocks: Any) -> tuple[list[str], ...]:
             if not all(isinstance(s, str) for s in block):
                 raise ValueError("Each satellite ID must be str")
             if len(block) < 2:
-                raise ValueError(
-                    "Each satellite block must contain at least 2 satellites"
-                )
+                raise ValueError("Each satellite block must contain at least 2 satellites")
             blocks.append(list(block))
         return tuple(blocks)
 
@@ -64,11 +60,7 @@ def add_widelane_to_epoch(obs_epoch: dict[str, dict[str, dict[str, float]]]) -> 
         if "L1" in obs and "L2" in obs:
             obs["WL"] = {
                 "phase_range": obs["L1"]["phase_range"] - obs["L2"]["phase_range"],
-                "code_range": (
-                    freq_L1 * obs["L1"]["code_range"]
-                    - freq_L2 * obs["L2"]["code_range"]
-                )
-                / (freq_L1 - freq_L2),
+                "code_range": (freq_L1 * obs["L1"]["code_range"] - freq_L2 * obs["L2"]["code_range"]) / (freq_L1 - freq_L2),
             }
 
 
@@ -101,9 +93,7 @@ def load_satpos_obs_and_spp(
     db_path: Path,
     epoch_dt: dt.datetime,
     sat_ids: list[str],
-) -> tuple[
-    dict[str, np.ndarray], dict[str, dict[str, dict[str, float]]], np.ndarray | None
-]:
+) -> tuple[dict[str, np.ndarray], dict[str, dict[str, dict[str, float]]], np.ndarray | None]:
     """Load satellite positions, observations, and optional SPP position for one epoch."""
     db = GnssDatabase(db_path)
     satpos: dict[str, np.ndarray] = {}
@@ -127,9 +117,7 @@ def load_satpos_obs_and_spp(
             if sid not in sat_ids:
                 continue
             if sat.position is not None:
-                satpos[sid] = np.array(
-                    [sat.position.x, sat.position.y, sat.position.z], dtype=float
-                )
+                satpos[sid] = np.array([sat.position.x, sat.position.y, sat.position.z], dtype=float)
             obs[sid] = {
                 sig.band: {
                     "code_range": float(sig.pseudorange),
@@ -203,22 +191,12 @@ def main() -> int:
     dd_matrix, satellite_order = block_doble_differencing_matrix(satellite_blocks)
     num_dd = dd_matrix.shape[0]
     if num_dd == 0:
-        raise ValueError(
-            "At least one satellite block must contain 2 or more satellites"
-        )
+        raise ValueError("At least one satellite block must contain 2 or more satellites")
 
-    satpos_ep1_rover, obs_ep1_rover, spp_ep1_rover = load_satpos_obs_and_spp(
-        rover_db, epoch1, satellite_order
-    )
-    satpos_ep2_rover, obs_ep2_rover, _ = load_satpos_obs_and_spp(
-        rover_db, epoch2, satellite_order
-    )
-    satpos_ep1_base, obs_ep1_base, spp_ep1_base = load_satpos_obs_and_spp(
-        base_db, epoch1, satellite_order
-    )
-    satpos_ep2_base, obs_ep2_base, _ = load_satpos_obs_and_spp(
-        base_db, epoch2, satellite_order
-    )
+    satpos_ep1_rover, obs_ep1_rover, spp_ep1_rover = load_satpos_obs_and_spp(rover_db, epoch1, satellite_order)
+    satpos_ep2_rover, obs_ep2_rover, _ = load_satpos_obs_and_spp(rover_db, epoch2, satellite_order)
+    satpos_ep1_base, obs_ep1_base, spp_ep1_base = load_satpos_obs_and_spp(base_db, epoch1, satellite_order)
+    satpos_ep2_base, obs_ep2_base, _ = load_satpos_obs_and_spp(base_db, epoch2, satellite_order)
 
     if "WL" in bands:
         add_widelane_to_epoch(obs_ep1_rover)
@@ -226,25 +204,13 @@ def main() -> int:
         add_widelane_to_epoch(obs_ep1_base)
         add_widelane_to_epoch(obs_ep2_base)
 
-    base_pos = (
-        np.array(cfg.get("base_position_ecef"), dtype=float)
-        if "base_position_ecef" in cfg
-        else spp_ep1_base
-    )
+    base_pos = np.array(cfg.get("base_position_ecef"), dtype=float) if "base_position_ecef" in cfg else spp_ep1_base
     if base_pos is None:
-        raise ValueError(
-            "base_position_ecef is not provided and base SPP solution is unavailable"
-        )
+        raise ValueError("base_position_ecef is not provided and base SPP solution is unavailable")
 
-    rover_pos = (
-        np.array(cfg.get("initial_rover_position_ecef"), dtype=float)
-        if "initial_rover_position_ecef" in cfg
-        else spp_ep1_rover
-    )
+    rover_pos = np.array(cfg.get("initial_rover_position_ecef"), dtype=float) if "initial_rover_position_ecef" in cfg else spp_ep1_rover
     if rover_pos is None:
-        raise ValueError(
-            "initial_rover_position_ecef is not provided and rover SPP solution is unavailable"
-        )
+        raise ValueError("initial_rover_position_ecef is not provided and rover SPP solution is unavailable")
 
     sigma_phi_cfg = cfg.get("sigma_phi", {})
     sigma_phi = {b: float(sigma_phi_cfg.get(b, 0.01)) for b in bands}
@@ -264,22 +230,10 @@ def main() -> int:
         dd_obs_ep1[b] = dd_matrix @ np.array(phi1, dtype=float)
         dd_obs_ep2[b] = dd_matrix @ np.array(phi2, dtype=float)
 
-        cpb1 = [
-            obs_ep1_rover[s][b]["code_range"] / wl - obs_ep1_rover[s][b]["phase_range"]
-            for s in satellite_order
-        ]
-        cpb1 += [
-            obs_ep1_base[s][b]["code_range"] / wl - obs_ep1_base[s][b]["phase_range"]
-            for s in satellite_order
-        ]
-        cpb2 = [
-            obs_ep2_rover[s][b]["code_range"] / wl - obs_ep2_rover[s][b]["phase_range"]
-            for s in satellite_order
-        ]
-        cpb2 += [
-            obs_ep2_base[s][b]["code_range"] / wl - obs_ep2_base[s][b]["phase_range"]
-            for s in satellite_order
-        ]
+        cpb1 = [obs_ep1_rover[s][b]["code_range"] / wl - obs_ep1_rover[s][b]["phase_range"] for s in satellite_order]
+        cpb1 += [obs_ep1_base[s][b]["code_range"] / wl - obs_ep1_base[s][b]["phase_range"] for s in satellite_order]
+        cpb2 = [obs_ep2_rover[s][b]["code_range"] / wl - obs_ep2_rover[s][b]["phase_range"] for s in satellite_order]
+        cpb2 += [obs_ep2_base[s][b]["code_range"] / wl - obs_ep2_base[s][b]["phase_range"] for s in satellite_order]
 
         dd_code_phase_bias_ep1[b] = dd_matrix @ np.array(cpb1, dtype=float)
         dd_code_phase_bias_ep2[b] = dd_matrix @ np.array(cpb2, dtype=float)
@@ -299,9 +253,7 @@ def main() -> int:
             row = (2 * ib + ie) * num_dd
             w[row : row + num_dd, row : row + num_dd] = w_block
 
-    dd_phase_biases: dict[str, np.ndarray] = {
-        b: np.zeros(num_dd, dtype=float) for b in bands
-    }
+    dd_phase_biases: dict[str, np.ndarray] = {b: np.zeros(num_dd, dtype=float) for b in bands}
 
     for _ in range(10):
         n_unk = 3 + num_bands * num_dd
@@ -309,19 +261,11 @@ def main() -> int:
         h = np.zeros((n_obs, n_unk), dtype=float)
 
         los_ep1 = np.array(
-            [
-                (satpos_ep1_rover[s] - rover_pos)
-                / np.linalg.norm(satpos_ep1_rover[s] - rover_pos)
-                for s in satellite_order
-            ],
+            [(satpos_ep1_rover[s] - rover_pos) / np.linalg.norm(satpos_ep1_rover[s] - rover_pos) for s in satellite_order],
             dtype=float,
         )
         los_ep2 = np.array(
-            [
-                (satpos_ep2_rover[s] - rover_pos)
-                / np.linalg.norm(satpos_ep2_rover[s] - rover_pos)
-                for s in satellite_order
-            ],
+            [(satpos_ep2_rover[s] - rover_pos) / np.linalg.norm(satpos_ep2_rover[s] - rover_pos) for s in satellite_order],
             dtype=float,
         )
 
@@ -348,12 +292,8 @@ def main() -> int:
                 base_pos,
             )
 
-            dy[row_ep1 : row_ep1 + num_dd] = dd_obs_ep1[b] - (
-                dd_rho_ep1 / wl + dd_phase_biases[b]
-            )
-            dy[row_ep2 : row_ep2 + num_dd] = dd_obs_ep2[b] - (
-                dd_rho_ep2 / wl + dd_phase_biases[b]
-            )
+            dy[row_ep1 : row_ep1 + num_dd] = dd_obs_ep1[b] - (dd_rho_ep1 / wl + dd_phase_biases[b])
+            dy[row_ep2 : row_ep2 + num_dd] = dd_obs_ep2[b] - (dd_rho_ep2 / wl + dd_phase_biases[b])
 
             h[row_ep1 : row_ep1 + num_dd, :3] = -d_left @ los_ep1 / wl
             h[row_ep2 : row_ep2 + num_dd, :3] = -d_left @ los_ep2 / wl
@@ -370,9 +310,7 @@ def main() -> int:
         if np.linalg.norm(dx[:3]) < 1e-5 and np.linalg.norm(dx[3:]) < 1e-5:
             break
 
-    dd_phase_biases_int = {
-        b: np.round(v).astype(int) for b, v in dd_phase_biases.items()
-    }
+    dd_phase_biases_int = {b: np.round(v).astype(int) for b, v in dd_phase_biases.items()}
 
     def recalc_one_epoch(
         satpos_rover: dict[str, np.ndarray],
@@ -387,48 +325,33 @@ def main() -> int:
         for ib, b in enumerate(bands):
             s2 = sigma_phi[b] ** 2
             c_block = s2 * c_dd_base
-            w_epoch[
-                ib * num_dd : (ib + 1) * num_dd, ib * num_dd : (ib + 1) * num_dd
-            ] = np.linalg.inv(c_block)
+            w_epoch[ib * num_dd : (ib + 1) * num_dd, ib * num_dd : (ib + 1) * num_dd] = np.linalg.inv(c_block)
 
         for _ in range(10):
             dy_epoch = np.zeros(n_obs_epoch, dtype=float)
             h_epoch = np.zeros((n_obs_epoch, 3), dtype=float)
 
             los = np.array(
-                [
-                    (satpos_rover[s] - pos) / np.linalg.norm(satpos_rover[s] - pos)
-                    for s in satellite_order
-                ],
+                [(satpos_rover[s] - pos) / np.linalg.norm(satpos_rover[s] - pos) for s in satellite_order],
                 dtype=float,
             )
 
             for ib, b in enumerate(bands):
                 wl = WLENS[b]
                 row = ib * num_dd
-                dd_rho = dd_geometric_ranges(
-                    satpos_rover, satpos_base, satellite_order, dd_matrix, pos, base_pos
-                )
-                dy_epoch[row : row + num_dd] = dd_obs_by_band[b] - (
-                    dd_rho / wl + dd_phase_biases_int[b]
-                )
+                dd_rho = dd_geometric_ranges(satpos_rover, satpos_base, satellite_order, dd_matrix, pos, base_pos)
+                dy_epoch[row : row + num_dd] = dd_obs_by_band[b] - (dd_rho / wl + dd_phase_biases_int[b])
                 h_epoch[row : row + num_dd, :] = -d_left @ los / wl
 
             htw_epoch = h_epoch.T @ w_epoch
-            dpos, *_ = np.linalg.lstsq(
-                htw_epoch @ h_epoch, htw_epoch @ dy_epoch, rcond=None
-            )
+            dpos, *_ = np.linalg.lstsq(htw_epoch @ h_epoch, htw_epoch @ dy_epoch, rcond=None)
             pos = pos + dpos
             if np.linalg.norm(dpos) < 1e-5:
                 break
         return pos
 
-    rover_pos_ep1 = recalc_one_epoch(
-        satpos_ep1_rover, satpos_ep1_base, dd_obs_ep1, rover_pos
-    )
-    rover_pos_ep2 = recalc_one_epoch(
-        satpos_ep2_rover, satpos_ep2_base, dd_obs_ep2, rover_pos
-    )
+    rover_pos_ep1 = recalc_one_epoch(satpos_ep1_rover, satpos_ep1_base, dd_obs_ep1, rover_pos)
+    rover_pos_ep2 = recalc_one_epoch(satpos_ep2_rover, satpos_ep2_base, dd_obs_ep2, rover_pos)
 
     result = {
         "base_db": str(base_db),

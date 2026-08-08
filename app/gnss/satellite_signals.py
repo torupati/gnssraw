@@ -1,21 +1,19 @@
-from logging import getLogger
 import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from logging import getLogger
 from pathlib import Path
-from typing import Optional, List, Dict
-
-import numpy as np
 
 import georinex as gr
+import numpy as np
 
 from app.gnss.constants import (
     CLIGHT,
+    E5B_FREQ,
+    E8_FREQ,
     L1_FREQ,
     L2_FREQ,
     L5_FREQ,
-    E5B_FREQ,
-    E8_FREQ,
     wlen_L1,
     wlen_L2,
     wlen_L5,
@@ -83,21 +81,13 @@ class SatelliteObservation:
 
     prn: int
     signals: dict  # key: band (str), value: SatelliteSignalObservation
-    ambiguities: (
-        dict  # key: combination (str like "L1_L2"), value: AmbiguityObservation
-    )
+    ambiguities: dict  # key: combination (str like "L1_L2"), value: AmbiguityObservation
 
-    def add_signal_observation(
-        self, band_name: str, signal_obs: SatelliteSignalObservation
-    ):
+    def add_signal_observation(self, band_name: str, signal_obs: SatelliteSignalObservation):
         self.signals[band_name] = signal_obs
 
     def __str__(self):
-        return (
-            f"SatelliteObservation(prn={self.prn}, "
-            f"signals={list(self.signals.keys())}, "
-            f"ambiguities={list(self.ambiguities.keys())})"
-        )
+        return f"SatelliteObservation(prn={self.prn}, signals={list(self.signals.keys())}, ambiguities={list(self.ambiguities.keys())})"
 
 
 @dataclass
@@ -155,9 +145,7 @@ class PairedObservation:
     datetime: datetime
     observation: EpochObservations
     ref_observation: EpochObservations
-    combined_observations: Optional[List[Dict]] = (
-        None  # list of combined observation dicts
-    )
+    combined_observations: list[dict] | None = None  # list of combined observation dicts
 
     @property
     def time_str(self) -> str:
@@ -197,38 +185,23 @@ def compute_dual_frequency_ambiguity(
     wl_wlen = CLIGHT / (freq1 - freq2)
     cp_wl = cp_f1 - cp_f2
     pr_nl = (freq1 / (freq1 + freq2)) * pr_f1 + (freq2 / (freq1 + freq2)) * pr_f2
-    amb_wl = (
-        cp_wl - pr_nl / wl_wlen
-    )  # geometry-free and ionosphere-free ambiguity (N1 - N2)
+    amb_wl = cp_wl - pr_nl / wl_wlen  # geometry-free and ionosphere-free ambiguity (N1 - N2)
 
     # Compute ionofree ambiguity (cycles)
     pr_if = (freq1**2 * pr_f1 - freq2**2 * pr_f2) / (freq1**2 - freq2**2)
-    cp_if = (freq1**2 * wlen1 * cp_f1 - freq2**2 * wlen2 * cp_f2) / (
-        freq1**2 - freq2**2
-    )
-    amb_iono = (cp_if - pr_if) / (
-        (freq1**2) / (freq1**2 - freq2**2) * wlen1
-        + (freq2**2) / (freq1**2 - freq2**2) * wlen2
-    )
+    cp_if = (freq1**2 * wlen1 * cp_f1 - freq2**2 * wlen2 * cp_f2) / (freq1**2 - freq2**2)
+    amb_iono = (cp_if - pr_if) / ((freq1**2) / (freq1**2 - freq2**2) * wlen1 + (freq2**2) / (freq1**2 - freq2**2) * wlen2)
 
     # Compute geometry-free ambiguity (cycles)
-    amb_geofree = (cp_f1 * wlen1 - cp_f2 * wlen2) / (wlen1 - wlen2) - np.round(
-        amb_wl
-    ) / (wlen1 - wlen2)
+    amb_geofree = (cp_f1 * wlen1 - cp_f2 * wlen2) / (wlen1 - wlen2) - np.round(amb_wl) / (wlen1 - wlen2)
 
     # Compute multipath estimate (meters) using geometry-free combination
-    mp_estimate = (pr_f1 - wlen1 * cp_f1) + wlen1**2 * (
-        wlen2 * cp_f2 - wlen1 * cp_f1
-    ) / (wlen2**2 - wlen1**2)
+    mp_estimate = (pr_f1 - wlen1 * cp_f1) + wlen1**2 * (wlen2 * cp_f2 - wlen1 * cp_f1) / (wlen2**2 - wlen1**2)
 
-    return AmbiguityObservation(
-        widelane=amb_wl, ionofree=amb_iono, geofree=amb_geofree, multipath=mp_estimate
-    )
+    return AmbiguityObservation(widelane=amb_wl, ionofree=amb_iono, geofree=amb_geofree, multipath=mp_estimate)
 
 
-def compute_ambiguities_for_satellite(
-    sat_obs: SatelliteObservation, system_name: str
-) -> dict:
+def compute_ambiguities_for_satellite(sat_obs: SatelliteObservation, system_name: str) -> dict:
     """
     Compute widelane and ionofree ambiguities for all available frequency pairs.
 
@@ -355,9 +328,7 @@ def parse_rinex_observation_file(
         # Convert numpy.datetime64 to seconds since Unix epoch, then to a naive UTC datetime
         timestamp_seconds = time_val.astype("datetime64[s]").astype("int64")
         epoch_obs = EpochObservations(
-            datetime=datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).replace(
-                tzinfo=None
-            ),
+            datetime=datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).replace(tzinfo=None),
             satellites_gps=[],
             satellites_qzss=[],
             satellites_galileo=[],
@@ -389,9 +360,7 @@ def parse_rinex_observation_file(
                     snr_key = f"S{band_number}{signal_code}"
 
                     # Check if all required keys exist in the dataset
-                    if not all(
-                        key in _data for key in [pr_key, cp_key, dp_key, snr_key]
-                    ):
+                    if not all(key in _data for key in [pr_key, cp_key, dp_key, snr_key]):
                         continue
 
                     pr = _data[pr_key].sel(sv=sv, time=time_val).values
@@ -401,12 +370,7 @@ def parse_rinex_observation_file(
 
                     # Skip if any value is NaN or size is 0
                     if pr.size > 0 and cp.size > 0 and dp.size > 0 and snr.size > 0:
-                        if not (
-                            np.isnan(pr).any()
-                            or np.isnan(cp).any()
-                            or np.isnan(dp).any()
-                            or np.isnan(snr).any()
-                        ):
+                        if not (np.isnan(pr).any() or np.isnan(cp).any() or np.isnan(dp).any() or np.isnan(snr).any()):
                             signal_obs = SatelliteSignalObservation(
                                 pseudorange=float(pr),
                                 carrier_phase=float(cp),
@@ -420,9 +384,7 @@ def parse_rinex_observation_file(
                 if sat_obs.signals:
                     # Compute ambiguities for GPS/QZSS/Galileo
                     if system_name in ["GPS", "QZSS", "Galileo"]:
-                        sat_obs.ambiguities = compute_ambiguities_for_satellite(
-                            sat_obs, system_name
-                        )
+                        sat_obs.ambiguities = compute_ambiguities_for_satellite(sat_obs, system_name)
 
                     if system_name == "GPS":
                         epoch_obs.satellites_gps.append(sat_obs)
@@ -485,21 +447,15 @@ def compute_ambiguity_statistics(
                         }
 
                     # Record epoch time
-                    satellite_ambiguity_data[sat_id][comb_name]["times"].append(
-                        epoch.datetime
-                    )
+                    satellite_ambiguity_data[sat_id][comb_name]["times"].append(epoch.datetime)
 
-                    satellite_ambiguity_data[sat_id][comb_name][
-                        "widelane_values"
-                    ].append(amb_obs.widelane)
+                    satellite_ambiguity_data[sat_id][comb_name]["widelane_values"].append(amb_obs.widelane)
 
                     # Extract SNR from the first band in the combination
                     # For "L1_L2", get SNR from L1 band
                     first_band = comb_name.split("_")[0]
                     if first_band in sat_obs.signals:
-                        satellite_ambiguity_data[sat_id][comb_name][
-                            "snr_values"
-                        ].append(sat_obs.signals[first_band].snr)
+                        satellite_ambiguity_data[sat_id][comb_name]["snr_values"].append(sat_obs.signals[first_band].snr)
 
     # Compute statistics for each satellite-band combination
     statistics = []
@@ -515,9 +471,7 @@ def compute_ambiguity_statistics(
 
             if wl_values:
                 wl_mean = sum(wl_values) / len(wl_values)
-                wl_std = (
-                    sum((x - wl_mean) ** 2 for x in wl_values) / len(wl_values)
-                ) ** 0.5
+                wl_std = (sum((x - wl_mean) ** 2 for x in wl_values) / len(wl_values)) ** 0.5
                 wl_max_min = max(wl_values) - min(wl_values)
             else:
                 wl_mean = wl_std = wl_max_min = 0.0

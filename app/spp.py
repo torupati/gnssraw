@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
-from logging import getLogger, basicConfig, INFO
+from logging import INFO, basicConfig, getLogger
 from pathlib import Path
 
 import numpy as np
@@ -15,11 +15,11 @@ from app.gnss.constants import CLIGHT
 from app.gnss.coordinates import ecef_to_enu_matrix, ecef_to_llh
 from app.gnss.database import GnssDatabase
 from app.gnss.ephemeris import (
-    read_rinex_nav,
-    compute_satellite_state,
-    GPSEphemeris,
-    datetime_to_gps_week_seconds,
     OMEGA_E,
+    GPSEphemeris,
+    compute_satellite_state,
+    datetime_to_gps_week_seconds,
+    read_rinex_nav,
 )
 from app.gnss.ionosphere import KlobucharManager, KlobucharModel
 from app.gnss.satellite_signals import (
@@ -52,14 +52,10 @@ def select_ephemeris(
     if not messages:
         raise ValueError(f"No ephemeris available for satellite {sv}")
     # Return the ephemeris with the closest toe to sow
-    return min(
-        messages, key=lambda msg: abs((sow - msg.toe + 302400) % 604800 - 302400)
-    )
+    return min(messages, key=lambda msg: abs((sow - msg.toe + 302400) % 604800 - 302400))
 
 
-def apply_earth_rotation_correction(
-    sat_pos: np.ndarray, travel_time: float
-) -> np.ndarray:
+def apply_earth_rotation_correction(sat_pos: np.ndarray, travel_time: float) -> np.ndarray:
     """
     Apply Earth rotation correction to satellite position.
 
@@ -212,9 +208,7 @@ def build_observation_matrix(
         iono = 0.0
         if iono_model is not None:
             if elev > 0 and iono_model is not None:
-                iono_val = iono_model.calculate_delay(
-                    epoch_dt, receiver_llh_rad, az, elev
-                )
+                iono_val = iono_model.calculate_delay(epoch_dt, receiver_llh_rad, az, elev)
                 if np.isfinite(iono_val):
                     iono = iono_val
                     logger.debug(
@@ -377,9 +371,7 @@ def main() -> int:
         # Use QZSS ionosphere params only if GPS ones are absent
         for key, val in qzss_ion_params.items():
             ion_params.setdefault(key, val)
-        logger.info(
-            "Loaded QZSS nav: %d satellites from %s", len(qzss_nav_data), qzss_nav_path
-        )
+        logger.info("Loaded QZSS nav: %d satellites from %s", len(qzss_nav_data), qzss_nav_path)
 
     logger.info("Ionosphere parameters from RINEX nav: %s", ion_params)
 
@@ -395,9 +387,7 @@ def main() -> int:
         ionosphere_manager.get_model_for_time(epochs[0].datetime) if epochs else None,
     )
 
-    solutions = single_point_positioning(
-        epochs, nav_data, ionosphere_manager=ionosphere_manager
-    )
+    solutions = single_point_positioning(epochs, nav_data, ionosphere_manager=ionosphere_manager)
 
     for sol in solutions:
         lat, lon, h = sol.position_llh
@@ -438,9 +428,7 @@ def main() -> int:
                     "position_llh": sol.position_llh.tolist(),
                     "clock_bias_m": sol.clock_bias_m,
                     "num_satellites": sol.num_sats,
-                    "residuals": sol.residuals.tolist()
-                    if sol.residuals.size > 0
-                    else None,
+                    "residuals": sol.residuals.tolist() if sol.residuals.size > 0 else None,
                 },
                 sol.datetime,
             )

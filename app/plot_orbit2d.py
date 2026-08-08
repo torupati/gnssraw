@@ -24,11 +24,11 @@ import math
 import urllib.parse
 from datetime import datetime, timezone
 
-import matplotlib
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from skyfield.api import load, EarthSatellite, wgs84
+import matplotlib
+import matplotlib.pyplot as plt
+from skyfield.api import EarthSatellite, load, wgs84
 from skyfield.timelib import Time
 
 matplotlib.rcParams["figure.dpi"] = 120
@@ -48,12 +48,8 @@ PROJECTIONS: dict[str, tuple[str, object]] = {
 
 # CelesTrak TLE base URL (no auth required)
 _CELESTRAK_BASE = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=TLE"
-_CELESTRAK_NAME_URL = (
-    "https://celestrak.org/NORAD/elements/gp.php?NAME={name}&FORMAT=TLE"
-)
-_CELESTRAK_CATNR_URL = (
-    "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
-)
+_CELESTRAK_NAME_URL = "https://celestrak.org/NORAD/elements/gp.php?NAME={name}&FORMAT=TLE"
+_CELESTRAK_CATNR_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
 
 # Default track duration for LEO satellites — overridden when --orbits is used
 _LEO_TRACK_MINUTES = 95 * 2
@@ -95,9 +91,7 @@ def parse_epoch(s: str) -> datetime:
             return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-    raise ValueError(
-        f"Cannot parse epoch '{s}'. Expected ISO 8601 format, e.g. 2027-01-15T06:30:00"
-    )
+    raise ValueError(f"Cannot parse epoch '{s}'. Expected ISO 8601 format, e.g. 2027-01-15T06:30:00")
 
 
 def resolve_constellation(name: str) -> str:
@@ -120,11 +114,7 @@ def fetch_satellites(constellation: str) -> tuple[list[EarthSatellite], object]:
     satellites = load.tle_file(url, filename=cache_filename)
     # Filter by name prefix when the group contains multiple constellations (e.g. gnss)
     if name_prefixes is not None:
-        satellites = [
-            s
-            for s in satellites
-            if any(s.name.startswith(prefix) for prefix in name_prefixes)
-        ]
+        satellites = [s for s in satellites if any(s.name.startswith(prefix) for prefix in name_prefixes)]
     print(f"Loaded {len(satellites)} {constellation} satellites from CelesTrak")
     return satellites, ts
 
@@ -144,10 +134,7 @@ def fetch_satellite_by_spec(spec: str, ts) -> EarthSatellite:
     try:
         satellites = load.tle_file(url, filename=cache_filename)
     except OSError as exc:
-        raise ValueError(
-            f"Satellite '{spec}' not found on CelesTrak (HTTP 404). "
-            "It may have de-orbited. Try a different name or NORAD ID."
-        ) from exc
+        raise ValueError(f"Satellite '{spec}' not found on CelesTrak (HTTP 404). It may have de-orbited. Try a different name or NORAD ID.") from exc
     if not satellites:
         raise ValueError(f"No satellite found for '{spec}'.")
     if len(satellites) > 1:
@@ -193,9 +180,7 @@ def compute_ground_track(
     half = duration_minutes / 2.0
     t_start = ts.tt_jd(t_epoch.tt - half / 1440.0)
     t_end = ts.tt_jd(t_epoch.tt + half / 1440.0)
-    times = ts.tt_jd(
-        [t_start.tt + i * (t_end.tt - t_start.tt) / (steps - 1) for i in range(steps)]
-    )
+    times = ts.tt_jd([t_start.tt + i * (t_end.tt - t_start.tt) / (steps - 1) for i in range(steps)])
     subpoints = wgs84.subpoint_of(sat.at(times))
     return subpoints.longitude.degrees.tolist(), subpoints.latitude.degrees.tolist()
 
@@ -251,9 +236,7 @@ def _draw_satellite_tracks(
         color = single_color if single_color else cmap(idx / max(num_sats - 1, 1))
 
         try:
-            lons, lats = compute_ground_track(
-                sat, ts, t_epoch, duration_minutes=duration_minutes
-            )
+            lons, lats = compute_ground_track(sat, ts, t_epoch, duration_minutes=duration_minutes)
         except Exception as exc:
             print(f"  Warning: {sat.name} ground track failed: {exc}")
             continue
@@ -311,9 +294,7 @@ def _make_map_axes(projection: str) -> tuple:
     ax.add_feature(cfeature.OCEAN, facecolor="#c6ddf0", zorder=0)
     ax.add_feature(cfeature.COASTLINE, linewidth=0.4, edgecolor="#555555", zorder=1)
     ax.add_feature(cfeature.BORDERS, linewidth=0.2, edgecolor="#888888", zorder=1)
-    ax.gridlines(
-        draw_labels=False, linewidth=0.3, color="#aaaaaa", linestyle="--", zorder=1
-    )
+    ax.gridlines(draw_labels=False, linewidth=0.3, color="#aaaaaa", linestyle="--", zorder=1)
     return fig, ax, proj_label
 
 
@@ -333,8 +314,7 @@ def plot_orbits(
 
     epoch_str = epoch_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     ax.set_title(
-        f"{constellation} Satellite Ground Tracks & Positions"
-        f"  [{proj_label} projection]\n{epoch_str}",
+        f"{constellation} Satellite Ground Tracks & Positions  [{proj_label} projection]\n{epoch_str}",
         fontsize=13,
         pad=10,
     )
@@ -360,9 +340,7 @@ def plot_single_orbit(
     duration_minutes = int(period_min * num_orbits)
     t_epoch = build_epoch_time(ts, epoch_utc)
     fig, ax, proj_label = _make_map_axes(projection)
-    _draw_satellite_tracks(
-        ax, [sat], ts, t_epoch, duration_minutes, single_color="#e84545"
-    )
+    _draw_satellite_tracks(ax, [sat], ts, t_epoch, duration_minutes, single_color="#e84545")
     epoch_str = epoch_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     orbit_label = f"{num_orbits} orbit{'s' if num_orbits != 1 else ''}"
     ax.set_title(
@@ -406,10 +384,7 @@ def main() -> None:
         "--satellite",
         metavar="NAME_OR_ID",
         default=None,
-        help=(
-            "Plot a single LEO satellite by name (e.g. STARLINK-1007) or "
-            "NORAD catalog number (e.g. 44713). Overrides --constellation."
-        ),
+        help=("Plot a single LEO satellite by name (e.g. STARLINK-1007) or NORAD catalog number (e.g. 44713). Overrides --constellation."),
     )
     parser.add_argument(
         "-p",
@@ -424,10 +399,7 @@ def main() -> None:
         "--epoch",
         metavar="DATETIME",
         default=None,
-        help=(
-            "Plot epoch in ISO 8601 UTC (default: 2027-01-15T00:00:00). "
-            "Example: 2027-06-01T12:30:00"
-        ),
+        help=("Plot epoch in ISO 8601 UTC (default: 2027-01-15T00:00:00). Example: 2027-06-01T12:30:00"),
     )
     parser.add_argument(
         "-n",

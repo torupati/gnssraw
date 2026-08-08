@@ -6,7 +6,6 @@ these values without circular dependencies.
 
 from datetime import datetime, timezone
 
-
 CLIGHT: float = 299_792_458.0
 
 # L-band carrier frequencies (Hz)
@@ -40,8 +39,6 @@ wl_wlen: float = CLIGHT / (L1_FREQ - L2_FREQ)
 nl_wlen: float = CLIGHT / (L1_FREQ + L2_FREQ)
 
 # Iono-free combined effective wavelength (m)
-iono_wlen: float = (L1_FREQ**2) / (L1_FREQ**2 - L2_FREQ**2) * wlen_L1 + (
-    (L2_FREQ**2) / (L1_FREQ**2 - L2_FREQ**2)
-) * wlen_L2
+iono_wlen: float = (L1_FREQ**2) / (L1_FREQ**2 - L2_FREQ**2) * wlen_L1 + ((L2_FREQ**2) / (L1_FREQ**2 - L2_FREQ**2)) * wlen_L2
 
 GPS_EPOCH = datetime(1980, 1, 6, tzinfo=timezone.utc)
