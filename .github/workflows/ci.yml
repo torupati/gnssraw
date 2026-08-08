@@ -30,7 +30,7 @@ jobs:
         run: ruff check ./app/ --output-format=github
 
       - name: Ruff format (check)
-        run: ruff format --check .
+        run: ruff format ./app/ --check .
 
       - name: Mypy
         env:

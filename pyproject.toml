@@ -55,7 +55,7 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.ruff]
-exclude = ["misc", "tests"]
+exclude = ["doc", "misc", "tests"]
 line-length = 160
 
 [tool.ruff.lint]
