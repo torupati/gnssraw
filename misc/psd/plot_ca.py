@@ -14,7 +14,7 @@ def plot_gps_ca_theoretical_psd(bw_mhz: float = 8.0) -> None:
     tau = np.linspace(-2 * Tc, 2 * Tc, 1000)
     acf = np.maximum(1.0 - np.abs(tau) / Tc, 0.0)
 
-    fig, axes = plt.subplots(2, 1, figsize=(8, 8))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     fig.suptitle("GPS C/A Code — Theoretical PSD and Autocorrelation")
 
     # --- PSD (top) ---
@@ -38,6 +38,8 @@ def plot_gps_ca_theoretical_psd(bw_mhz: float = 8.0) -> None:
     ax_acf.set_ylabel("Normalized Autocorrelation")
     ax_acf.set_xlim(-2 * Tc, 2 * Tc)
     ax_acf.set_ylim(-0.1, 1.1)
+    ax_acf.axhline(y=0, color="black", linestyle="--", alpha=0.6)
+    ax_acf.set_aspect('equal', adjustable='box')
     ax_acf.grid(True, which="both", linestyle=":", alpha=0.5)
     ax_acf.legend()
 
