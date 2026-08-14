@@ -42,7 +42,7 @@ the Early-minus-Late discriminator measures the slope asymmetry to estimate the 
 Narrowing the correlator spacing (e.g., narrow correlator, strobe) improves noise immunity
 and multipath resistance without changing the underlying triangular shape.
 
-## BOC
+## BOC(1,1)
 
 BOC (Binary Offset Carrier) places a square-wave subcarrier of frequency $f_s$ on top of
 the BPSK spreading code.
