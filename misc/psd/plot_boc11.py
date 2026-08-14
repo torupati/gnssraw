@@ -86,7 +86,7 @@ def plot_gps_boc_theoretical_psd(bw_mhz: float = 8.0):
     ax_acf.axhline(y=0, color="black", linestyle="--", alpha=0.6)
     ax_acf.grid(True, which="both", linestyle=":", alpha=0.5)
     ax_acf.legend(loc="upper right")
-    ax_acf.set_aspect("equal", adjustable="box")
+    #ax_acf.set_aspect("equal", adjustable="box")
 
     figamename = f"gps_boc_theoretical_psd_bw{bw_mhz:.1f}MHz.png"
     plt.savefig(figamename, dpi=300)

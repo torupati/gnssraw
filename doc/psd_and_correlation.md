@@ -1,6 +1,6 @@
 # Power Spectral Density and Correlation of GNSS signals
 
-## GPS C/A L1 code
+## BPSK (Binary Phase-Shift Keying)
 
 Basic signal structure is composed from carrier (L1 band, 1.5GHz) and spreading code (1.023MHz, chip rate, 1023 chip) and data (50 bps).
 
@@ -9,16 +9,40 @@ Multiplied the $C(t)D(t)$ with carrier wave $\cos(2\pi f_c t)$, its theoretical 
 Chip period $T_d = \frac{1}{f_c}$
 
 $$
-g(t) = \mathbf{rect}_{T_d} (t)
+g(t) = \text{rect}_{T_d} (t)
 $$
+
+The simbles are $a_k$, signal can be written $
+x(t) = \sum_{k=-\infty}^{\infty} a_k g(t-\frac{k}{T_d})
+$
+
+If $a_k$ can be assumed random and its frequency property can be assumed uniform, we can calculate its PSD only from $g(t)$. So, here after I calculate PSD form $g(t)$.
+
+
 
 $$
 \Phi(f) = T_d \mathbf{sinc}(\pi fT_d)
 $$
 
+For uncorrelated random chips ($E[a_k a_j] = \delta_{kj}$, zero mean, unit variance),
+the PSD of $x(t)$ follows from the Wiener–Khinchin theorem:
 
 $$
-G(f) = \frac{\sin^2(\frac{\pi f}{f_c})}{\left(\frac{πf}{fc}\right)^2}
+G_x(f) = \frac{|\Phi(f)|^2}{T_c}
+= \frac{T_c^2 \,\text{sinc}^2(\pi f T_c)}{T_c}
+= T_c \,\text{sinc}^2(\pi f T_c)
+$$
+
+Normalising by the peak value $G_x(0) = T_c$ gives the relative PSD:
+
+$$
+\hat{G}(f) = \text{sinc}^2(\pi f T_c)
+$$
+
+Expanding the normalised sinc with $T_c = 1/f_c$:
+
+$$
+G(f) = \frac{\sin^2(\frac{\pi f}{f_c})}{\left(\frac{\pi f}{f_c}\right)^2}
 $$
 
 ![GPS C/A PSD and ACF](./figures/gps_ca_theoretical_psd_bw8.0MHz.png)
@@ -91,3 +115,53 @@ Key features compared with BPSK:
   false lock in a standard DLL if the initial code phase is off by $\pm T_c/2$.
   Receiver designs for BOC must use an unambiguous acquisition strategy (e.g., BPSK-like
   envelope, bump-jumping, or MBOC modifications) to avoid locking onto a side lobe.
+
+## Higher-order BOC: BOC(10,5) and BOC(15,10) / AltBOC
+
+The figure below extends the comparison to two higher-order variants.
+All signals follow the same BOC$(m, n)$ notation: subcarrier frequency $f_s = m f_0$,
+chip rate $f_c = n f_0$ ($f_0 = 1.023\,\text{MHz}$), giving $N = 2m/n$ subcarrier
+half-cycles per chip.
+
+| Signal     | $m$ | $n$ | $f_s$ (MHz) | $f_c$ (MHz) | $N$ | Application         |
+|------------|-----|-----|-------------|-------------|-----|---------------------|
+| BOC(1,1)   |  1  |  1  |  1.023      |  1.023      |  2  | GPS L1C, Galileo E1 |
+| BOC(10,5)  | 10  |  5  | 10.23       |  5.115      |  4  | GPS M-code          |
+| BOC(15,10) | 15  | 10  | 15.345      | 10.23       |  3  | Galileo E5 (approx.)|
+
+![BPSK vs BOC variants PSD and ACF](./figures/gps_boc_variants_bw50MHz.png)
+
+Each PSD is independently normalised to its own peak (0 dB).
+The ACF x-axis is the normalised delay $\tau/T_c$ where $T_c = 1/f_c$ is each signal's own chip
+period, so the curves are directly comparable regardless of chip rate.
+
+**Left — PSD.**
+The main lobes sit at $\pm f_s$, with higher-order side lobes spaced $2f_s$ apart.
+
+- **BOC(10,5)** (green, $N=4$, even): main lobes at $\pm 10.23\,\text{MHz}$; the wider
+  occupied bandwidth ($\approx 24\,\text{MHz}$) makes it resistant to narrowband jamming
+  and is used for the GPS M-code military signal.
+- **BOC(15,10)** (purple, $N=3$, odd): because $N$ is odd, the PSD formula uses
+  $\cos^2(\pi f/f_c)$ rather than $\sin^2$, so the spectrum does **not** have a null at $f=0$;
+  residual power near DC is visible in the figure.
+  The main lobes peak near $\pm 15.345\,\text{MHz}$ with a wide occupied bandwidth of
+  $\approx 51\,\text{MHz}$.
+
+**Right — ACF.**
+The central peak narrows with increasing $N$ (width $\approx T_c/N$), improving ranging
+precision, while the sidelobe depth and count grow:
+
+- **BOC(10,5)** ($N=4$): a very sharp central peak (width $\approx T_c/4$), with sidelobes
+  at $\pm 0.25, \pm 0.75$ in normalised delay; the peak sidelobe level is $\approx -0.25$.
+- **BOC(15,10)** ($N=3$): intermediate width ($\approx T_c/3$), three lobes per half-chip;
+  the deepest sidelobe reaches $\approx -0.67$, creating a more severe false-lock risk than
+  BOC(10,5) despite the lower $N$.
+
+**Note on AltBOC.**
+Galileo E5 uses **AltBOC(15,10)**, which is not a simple binary BOC.
+AltBOC is a constant-envelope 8-PSK composite signal that simultaneously carries two
+sub-bands — E5a (1176.45 MHz) and E5b (1207.14 MHz) — in phase quadrature, achieving a
+combined double-sided bandwidth of $\approx 51\,\text{MHz}$.
+The figure shows plain BOC(15,10) as a single-component approximation of its spectral envelope;
+the true AltBOC differs in its inter-band sidelobe structure and requires a dedicated
+AltBOC receiver to exploit the full wideband correlation peak.
