@@ -1,22 +1,23 @@
 repos:
-  # ruff (Lint & Format) の設定
+  # ruff (Lint & Format) setup
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10  # 最新のバージョンを指定してください
+    rev: v0.14.10  # Use the latest version of ruff-pre-commit
     hooks:
-      # Linterを実行
+      # execute Linter
       - id: ruff
         args: [ --fix ]
-      # Formatterを実行
+      # execute formatter
       - id: ruff-format
 
-  # 一般的なコード品質チェック
+  # General code quality hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      - id: trailing-whitespace    # 行末の不要な空白を削除
-      - id: end-of-file-fixer      # ファイル末尾を改行で終わらせる
-      - id: check-yaml             # YAMLの構文チェック
-      - id: check-added-large-files # 巨大なファイルのコミットを防止
+      - id: trailing-whitespace    # remove trailing whitespace
+      - id: end-of-file-fixer      # ensure file ends with a newline
+      - id: check-yaml             # YAML file syntax check
+      - id: check-added-large-files # check for large files added to the repository
+        args: ["--maxkb=1000"]
 
   # mypy (Type Checking)
   - repo: https://github.com/pre-commit/mirrors-mypy
